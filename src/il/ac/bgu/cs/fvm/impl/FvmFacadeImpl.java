@@ -29,7 +29,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <S, A, P> TransitionSystem<S, A, P> createTransitionSystem() {
-        return new TransitionSystemImpl<S, A, P>();
+        return new TransitionSystemImpl<>();
     }
 
     @Override
@@ -124,7 +124,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <L, A> ProgramGraph<L, A> createProgramGraph() {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement createProgramGraph
+        return new ProgramGraphImpl<>();
     }
 
     @Override
