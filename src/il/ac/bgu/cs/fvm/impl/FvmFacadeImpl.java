@@ -29,7 +29,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <S, A, P> TransitionSystem<S, A, P> createTransitionSystem() {
-        throw new RuntimeException("Not supported yet psdsadasdasdasdaaaa."); // TODO: Implement createTransitionSystem
+        return new TransitionSystemImpl<S, A, P>();
     }
 
     @Override
