@@ -5,6 +5,8 @@
       <root url="jar://$PROJECT_DIR$/lib/org.svvrl.goal.core.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/antlr-4.5.1-complete.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/org.svvrl.goal.cmd.jar!/" />
+      <root url="file://$PROJECT_DIR$/../HW-Definitions/out" />
+      <root url="file://$PROJECT_DIR$/../HW-Definitions/out/production/HW-Definitions/il/ac/bgu/cs/fvm" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

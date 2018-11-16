@@ -13,6 +13,8 @@ import il.ac.bgu.cs.fvm.transitionsystem.AlternatingSequence;
 import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.fvm.util.Pair;
 import il.ac.bgu.cs.fvm.verification.VerificationResult;
+import org.svvrl.goal.core.aut.Run;
+
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +29,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <S, A, P> TransitionSystem<S, A, P> createTransitionSystem() {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement createTransitionSystem
+        throw new RuntimeException("Not supported yet psdsadasdasdasdaaaa."); // TODO: Implement createTransitionSystem
     }
 
     @Override
