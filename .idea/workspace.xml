@@ -40,15 +40,15 @@
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="iml" value="4" />
-          <entry key="java" value="2003" />
-          <entry key="txt" value="110" />
+          <entry key="java" value="2153" />
+          <entry key="txt" value="144" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="IDEA_MODULE" value="4" />
-          <entry key="JAVA" value="2003" />
-          <entry key="PLAIN_TEXT" value="110" />
+          <entry key="JAVA" value="2153" />
+          <entry key="PLAIN_TEXT" value="144" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.vcs.git.usages">
@@ -63,8 +63,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/FvmFacadeImpl.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="597">
-              <caret line="341" column="35" selection-start-line="341" selection-start-column="8" selection-end-line="341" selection-end-column="35" />
+            <state relative-caret-position="568">
+              <caret line="453" column="115" selection-start-line="453" selection-start-column="82" selection-end-line="453" selection-end-column="115" />
               <folding>
                 <element signature="imports" expanded="true" />
                 <element signature="docComment;class#FvmFacadeImpl#0" />
@@ -105,7 +105,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/TransitionSystemImpl.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="400">
+            <state relative-caret-position="-725">
               <caret line="16" selection-start-line="16" selection-end-line="16" selection-end-column="52" />
               <folding>
                 <element signature="e#1647#1648#0" expanded="true" />
@@ -197,6 +197,7 @@
       <find>interleave</find>
       <find>InitialState</find>
       <find>addTransition</find>
+      <find>setinitial</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -297,7 +298,7 @@
       <option name="presentableId" value="Default" />
       <updated>1542222379650</updated>
       <workItem from="1542222382730" duration="6601000" />
-      <workItem from="1542370245952" duration="22832000" />
+      <workItem from="1542370245952" duration="24250000" />
     </task>
     <task id="LOCAL-00001" summary="added dependencies">
       <created>1542376019757</created>
@@ -327,11 +328,18 @@
       <option name="project" value="LOCAL" />
       <updated>1542414407074</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="implemented transitionSystemFromCircuit method">
+      <created>1542416673285</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1542416673285</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="29433000" />
+    <option name="totallyTimeSpent" value="30851000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
@@ -393,7 +401,8 @@
     <MESSAGE value="added TransitionSystemImpl" />
     <MESSAGE value="added ProgramGraphImpl" />
     <MESSAGE value="implemented interleave method" />
-    <option name="LAST_COMMIT_MESSAGE" value="implemented interleave method" />
+    <MESSAGE value="implemented transitionSystemFromCircuit method" />
+    <option name="LAST_COMMIT_MESSAGE" value="implemented transitionSystemFromCircuit method" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/../HW-Definitions/out/production/HW-Definitions/il/ac/bgu/cs/fvm/automata/Automaton.class">
@@ -516,7 +525,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/TransitionSystemImpl.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="400">
+        <state relative-caret-position="-725">
           <caret line="16" selection-start-line="16" selection-end-line="16" selection-end-column="52" />
           <folding>
             <element signature="e#1647#1648#0" expanded="true" />
@@ -549,8 +558,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/FvmFacadeImpl.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="597">
-          <caret line="341" column="35" selection-start-line="341" selection-start-column="8" selection-end-line="341" selection-end-column="35" />
+        <state relative-caret-position="568">
+          <caret line="453" column="115" selection-start-line="453" selection-start-column="82" selection-end-line="453" selection-end-column="115" />
           <folding>
             <element signature="imports" expanded="true" />
             <element signature="docComment;class#FvmFacadeImpl#0" />

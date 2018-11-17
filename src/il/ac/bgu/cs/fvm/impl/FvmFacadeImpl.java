@@ -10,6 +10,8 @@ import il.ac.bgu.cs.fvm.programgraph.ActionDef;
 import il.ac.bgu.cs.fvm.programgraph.ConditionDef;
 import il.ac.bgu.cs.fvm.programgraph.PGTransition;
 import il.ac.bgu.cs.fvm.programgraph.ProgramGraph;
+import il.ac.bgu.cs.fvm.programgraph.ParserBasedActDef;
+import il.ac.bgu.cs.fvm.programgraph.ParserBasedCondDef;
 import il.ac.bgu.cs.fvm.transitionsystem.AlternatingSequence;
 import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.fvm.util.Pair;
@@ -151,7 +153,7 @@ public class FvmFacadeImpl implements FvmFacade {
         for(L1 initialLocationPG1 : initialLocationsPG1){
             for(L2 initialLocationPG2 : initialLocationsPG2){
                 Pair<L1,L2> newLocation = new Pair<>(initialLocationPG1, initialLocationPG2);
-                interleavedProgramGraph.setInitial(newLocation, false);
+                interleavedProgramGraph.setInitial(newLocation, true);
             }
         }
     }
@@ -290,7 +292,7 @@ public class FvmFacadeImpl implements FvmFacade {
             Map<String, Boolean> registersValues = new HashMap<>(registers);
             Pair<Map<String, Boolean>, Map<String, Boolean>> newState = new Pair<>(inputs, registersValues);
             transitionSystem.addState(newState);
-            transitionSystem.setInitial(newState, false);
+            transitionSystem.setInitial(newState, true);
         }
         else
         {
@@ -328,42 +330,110 @@ public class FvmFacadeImpl implements FvmFacade {
         return transitionSystem;
     }
 
-    private <L, A> void addInitialLocationsTSFromPG(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem, ProgramGraph<L, A> pg, Set<ActionDef> actionDefs)
+    private <L, A> void removeActionsNotReachable(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem)
     {
-        Set<List<String>> variableInitSet = pg.getInitalizations();
-        Set<Map<String, Object>> evals = new HashSet<Map<String,Object>>();
-        Set<L> initialLocations = pg.getInitialLocations();
-
-        for(List<String> variableInit : variableInitSet)
+        Set<A> reachableActions = new HashSet<>();
+        for(Transition<Pair<L, Map<String, Object>>, A> t : transitionSystem.getTransitions())
         {
-            Map<String, Object> variableInitMap = new HashMap<String, Object>();
-            for(String action : variableInit)
-                variableInitMap = ActionDef.effect(actionDefs, variableInitMap, action);
-            evals.add(variableInitMap);
+            reachableActions.add(t.getAction());
         }
 
+        Set<A> ourActions = new HashSet<>(transitionSystem.getActions());
+        for(A action : ourActions)
+            if(!reachableActions.contains(action))
+                transitionSystem.removeAction(action);
+    }
 
-        for(L l : initialLocations)
+    private <L, A> void addLabelsTransitionSystemFromProgramGraph(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem)
+    {
+        for(Pair<L, Map<String, Object>> state : transitionSystem.getStates())
         {
-            if(evals.isEmpty())
+            transitionSystem.addToLabel(state, state.first.toString());
+            for(String variable : state.second.keySet())
             {
-                Pair<L, Map<String, Object>> newState = new Pair<L, Map<String,Object>>(l, new HashMap<String, Object>());
-                transitionSystem.addState(newState);
-                transitionSystem.addInitialState(newState);
+                String newAtomicPreposition = variable + " = " + state.second.get(variable).toString();
+                transitionSystem.addToLabel(state,newAtomicPreposition);
             }
-            else
+        }
+    }
+
+    private <L, A> void addAtomicProposition(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem) {
+        for(Pair<L, Map<String, Object>> state : transitionSystem.getStates())
+        {
+            transitionSystem.addAtomicProposition(state.getFirst().toString());
+            for(String variable : state.second.keySet())
             {
-                for(Map<String, Object> eval : evals)
+                String newAtomicPreposition = variable + " = " + state.second.get(variable).toString();
+                transitionSystem.addAtomicProposition(newAtomicPreposition);
+            }
+        }
+    }
+
+    private <L, A> void transitionSystemFromProgramGraphFromInitialStates(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem,
+                        ProgramGraph<L, A> pg, Set<ActionDef> actionDefinitions, Set<ConditionDef> conditionDefinitions)
+    {
+        Deque<Pair<L, Map<String, Object>>> queue = new LinkedList<>(transitionSystem.getInitialStates());
+        Set<Pair<L, Map<String, Object>>> allReadyChecked = new HashSet<>(transitionSystem.getInitialStates());
+        while(!queue.isEmpty())
+        {
+            Pair<L, Map<String, Object>> fromState = queue.removeFirst();
+            for(PGTransition<L, A> pgTrans : pg.getTransitions())
+            {
+                if(pgTrans.getFrom().equals(fromState.first) && ConditionDef.evaluate(conditionDefinitions, fromState.getSecond(), pgTrans.getCondition())
+                        && ActionDef.effect(actionDefinitions, fromState.getSecond(), pgTrans.getAction()) != null)
                 {
-                    Pair<L, Map<String, Object>> newState = new Pair<L, Map<String,Object>>(l, new HashMap<String, Object>(eval));
-                    transitionSystem.addState(newState);
-                    transitionSystem.addInitialState(newState);
+                    Pair<L, Map<String, Object>> toState = new Pair<>
+                            (pgTrans.getTo(), ActionDef.effect(actionDefinitions, fromState.getSecond(), pgTrans.getAction()));
+                    Transition<Pair<L, Map<String, Object>>, A> newTransition = new Transition<>(fromState, pgTrans.getAction(), toState);
+                    if(!allReadyChecked.contains(toState))
+                    {
+                        transitionSystem.addState(toState);
+                        allReadyChecked.add(toState);
+                        queue.addLast(toState);
+                    }
+                    transitionSystem.addTransition(newTransition);
                 }
             }
         }
     }
 
-    private <L, A> void addAllActionsTSFromPG(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem, Set<PGTransition<L, A>> pgTransitions) {
+    private <L, A> void addInitialLocationsTransitionSystemFromProgramGraph(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem,
+                                                    ProgramGraph<L, A> programGraph, Set<ActionDef> actionDefinitions)
+    {
+        Set<List<String>> variableInitiationSet = programGraph.getInitalizations();
+        Set<Map<String, Object>> evaluations = new HashSet<>();
+        Set<L> initialLocations = programGraph.getInitialLocations();
+
+        for(List<String> variableInitiation : variableInitiationSet)
+        {
+            Map<String, Object> variableInitiationMap = new HashMap<>();
+            for(String action : variableInitiation)
+                variableInitiationMap = ActionDef.effect(actionDefinitions, variableInitiationMap, action);
+            evaluations.add(variableInitiationMap);
+        }
+
+
+        for(L l : initialLocations)
+        {
+            if(evaluations.isEmpty())
+            {
+                Pair<L, Map<String, Object>> newState = new Pair<>(l, new HashMap<>());
+                transitionSystem.addState(newState);
+                transitionSystem.setInitial(newState, true);
+            }
+            else
+            {
+                for(Map<String, Object> eval : evaluations)
+                {
+                    Pair<L, Map<String, Object>> newState = new Pair<>(l, new HashMap<>(eval));
+                    transitionSystem.addState(newState);
+                    transitionSystem.setInitial(newState, true);
+                }
+            }
+        }
+    }
+
+    private <L, A> void addAllActionsTransitionSystemFromProgramGraph(TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem, Set<PGTransition<L, A>> pgTransitions) {
         for(PGTransition<L, A> pgTransition : pgTransitions) {
             transitionSystem.addAction(pgTransition.getAction());
         }
@@ -373,18 +443,37 @@ public class FvmFacadeImpl implements FvmFacade {
     public <L, A> TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystemFromProgramGraph(ProgramGraph<L, A> programGraph,
                  Set<ActionDef> actionDefinitions, Set<ConditionDef> conditionDefinitions) {
         TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystem = createTransitionSystem();
-        addAllActionsTransitionSystemFromPG(transitionSystem, programGraph.getTransitions());
-        addInitialLocationsTSFromPG(transitionSystem, programGraph, actionDefinitions);
+        addAllActionsTransitionSystemFromProgramGraph(transitionSystem, programGraph.getTransitions());
+        addInitialLocationsTransitionSystemFromProgramGraph(transitionSystem, programGraph, actionDefinitions);
         transitionSystemFromProgramGraphFromInitialStates(transitionSystem, programGraph, actionDefinitions, conditionDefinitions);
         addAtomicProposition(transitionSystem);
-        addLabelsToTSFromPG(transitionSystem);
+        addLabelsTransitionSystemFromProgramGraph(transitionSystem);
         removeActionsNotReachable(transitionSystem);
         return transitionSystem;
     }
 
+    private <L,A> void addInitialStateTSFromCS(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> ts, ChannelSystem<L, A> cs, Set<ActionDef> effect)
+    {
+        List<L> newInitLocs = new ArrayList<L>();
+        List<List<String>> allInitializations = new ArrayList<List<String>>();
+        getAllInitializationsFromCS(cs, allInitializations, 0, new ArrayList<String>()); //into allInitializations
+        Set<Map<String, Object>> allEvals = getAllMapsFromInitializations(allInitializations, effect);
+        addInitialStatesTSFromCSHelp(ts, cs, newInitLocs, allEvals);
+    }
+
     @Override
     public <L, A> TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystemFromChannelSystem(ChannelSystem<L, A> cs) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromChannelSystem
+        TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> res = createTransitionSystem();
+        Set<ActionDef> effects = new HashSet<>();
+        effects.add(new ParserBasedActDef());
+        Set<ConditionDef> conditions = new HashSet<>();
+        conditions.add(new ParserBasedCondDef());
+        addInitialStateTSFromCS(res, cs, effects);
+        transitionSystemFromCSFromInitialStates(res, cs, effects, conditions);
+        addAtomicPropositionToTsFromCs(res);
+        addLabelsToTSFromCS(res);
+
+        return res;
     }
 
     @Override
