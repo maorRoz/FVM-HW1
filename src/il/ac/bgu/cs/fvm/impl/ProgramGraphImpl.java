@@ -36,8 +36,8 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A>{
     }
 
     @Override
-    public void addInitalization(List<String> init) {
-        variablesInitialization.add(init);
+    public void addInitalization(List<String> initialization) {
+        variablesInitialization.add(initialization);
 
     }
 
@@ -48,12 +48,12 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A>{
 
 
     @Override
-    public void setInitial(L location, boolean predicate){
-        if(predicate) {
-            initialLocation.add(location);
-        } else {
+    public void setInitial(L location, boolean isLocationExist){
+        if(!isLocationExist) {
             addLocation(location);
         }
+
+        initialLocation.add(location);
     }
 
     @Override

@@ -8,6 +8,7 @@ import il.ac.bgu.cs.fvm.circuits.Circuit;
 import il.ac.bgu.cs.fvm.ltl.LTL;
 import il.ac.bgu.cs.fvm.programgraph.ActionDef;
 import il.ac.bgu.cs.fvm.programgraph.ConditionDef;
+import il.ac.bgu.cs.fvm.programgraph.PGTransition;
 import il.ac.bgu.cs.fvm.programgraph.ProgramGraph;
 import il.ac.bgu.cs.fvm.transitionsystem.AlternatingSequence;
 import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
@@ -16,9 +17,11 @@ import il.ac.bgu.cs.fvm.verification.VerificationResult;
 import org.svvrl.goal.core.aut.Run;
 
 import java.io.InputStream;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * Implement the methods in this class. You may add additional classes as you
@@ -127,9 +130,74 @@ public class FvmFacadeImpl implements FvmFacade {
         return new ProgramGraphImpl<>();
     }
 
+    private <L1,L2,A> void addInterleavedInitializations(ProgramGraph<Pair<L1, L2>, A> interleavedProgramGraph,
+                                                         Set<List<String>> initializationsPG1, Set<List<String>> initializationsPG2){
+
+        for(List<String> initializationPG1 : initializationsPG1){
+            for(List<String> initializationPG2 : initializationsPG2){
+                List<String> newInitialization = new ArrayList<>(initializationPG1);
+                newInitialization.addAll(initializationPG2);
+                interleavedProgramGraph.addInitalization(newInitialization);
+            }
+        }
+
+    }
+
+    private <L1,L2,A> void addInterleavedLocations(ProgramGraph<Pair<L1, L2>, A> interleavedProgramGraph,
+                                                   Set<L1> initialLocationsPG1, Set<L2> initialLocationsPG2){
+
+        for(L1 initialLocationPG1 : initialLocationsPG1){
+            for(L2 initialLocationPG2 : initialLocationsPG2){
+                Pair<L1,L2> newLocation = new Pair<>(initialLocationPG1, initialLocationPG2);
+                interleavedProgramGraph.setInitial(newLocation, false);
+            }
+        }
+    }
+
+    private <L1,L2,A> void addInterleavedTransitions(ProgramGraph<Pair<L1, L2>, A> interleavedProgramGraph,
+                                                     Set<PGTransition<L1, A>> transitionsPG1, Set<PGTransition<L2, A>> transitionsPG2, Set<Pair<L1, L2>> locationsInterleaved){
+
+        Set<Pair<L1, L2>> locationsToInterleave = new HashSet<>(interleavedProgramGraph.getLocations());
+        locationsToInterleave.removeAll(locationsInterleaved);
+        if(locationsToInterleave.isEmpty()) { return; }
+
+        for(Pair<L1, L2> locationToInterleave : locationsToInterleave)
+        {
+            for(PGTransition<L1, A> transitionPG1 : transitionsPG1)
+            {
+                if(!transitionPG1.getFrom().equals(locationToInterleave.getFirst())){ continue;}
+
+                Pair<L1, L2> locationTo = new Pair<>(transitionPG1.getTo(), locationToInterleave.getSecond());
+                addLocationAndTransitionToProgramGraph(interleavedProgramGraph, locationToInterleave,transitionPG1.getCondition(), transitionPG1.getAction(), locationTo);
+            }
+
+            for(PGTransition<L2, A> transitionPG2 : transitionsPG2)
+            {
+                if(!transitionPG2.getFrom().equals(locationToInterleave.getSecond())){ continue;}
+
+                Pair<L1, L2> locationTo = new Pair<>(locationToInterleave.getFirst(), transitionPG2.getTo());
+                addLocationAndTransitionToProgramGraph(interleavedProgramGraph, locationToInterleave, transitionPG2.getCondition(), transitionPG2.getAction(), locationTo);
+            }
+        }
+
+        locationsInterleaved.addAll(locationsToInterleave);
+        addInterleavedTransitions(interleavedProgramGraph, transitionsPG1, transitionsPG2, locationsInterleaved);
+    }
+
+    private <L1, L2, A> void addLocationAndTransitionToProgramGraph(ProgramGraph<Pair<L1, L2>, A> interleavedProgramGraph,
+                       Pair<L1, L2> interleaveLocation, String condition, A action, Pair<L1, L2> locationTo){
+        interleavedProgramGraph.addLocation(locationTo);
+        PGTransition<Pair<L1, L2>, A> newTransition = new PGTransition<>(interleaveLocation, condition, action, locationTo);
+        interleavedProgramGraph.addTransition(newTransition);
+    }
+
     @Override
     public <L1, L2, A> ProgramGraph<Pair<L1, L2>, A> interleave(ProgramGraph<L1, A> pg1, ProgramGraph<L2, A> pg2) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
+        ProgramGraph<Pair<L1, L2>, A> interleavedProgramGraph = createProgramGraph();
+        addInterleavedInitializations(interleavedProgramGraph, pg1.getInitalizations(), pg2.getInitalizations());
+        addInterleavedLocations(interleavedProgramGraph, pg1.getInitialLocations(), pg2.getInitialLocations());
+        addInterleavedTransitions(interleavedProgramGraph, pg1.getTransitions(), pg2.getTransitions(), new HashSet<>());
+        return interleavedProgramGraph;
     }
 
     @Override
