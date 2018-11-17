@@ -1033,7 +1033,9 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromelaString
+        StmtContext stmtContext = NanoPromelaFileReader.pareseNanoPromelaString(nanopromela);
+        ProgramGraph<String, String> programGraph = programGraphFromRoot(stmtContext);
+        return programGraph;
     }
 
     @Override
