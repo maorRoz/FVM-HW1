@@ -40,14 +40,14 @@
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="iml" value="4" />
-          <entry key="java" value="2584" />
+          <entry key="java" value="2878" />
           <entry key="txt" value="144" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="IDEA_MODULE" value="4" />
-          <entry key="JAVA" value="2584" />
+          <entry key="JAVA" value="2878" />
           <entry key="PLAIN_TEXT" value="144" />
         </counts>
       </usages-collector>
@@ -63,8 +63,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/FvmFacadeImpl.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="518">
-              <caret line="702" column="79" selection-start-line="702" selection-start-column="72" selection-end-line="702" selection-end-column="79" />
+            <state relative-caret-position="368">
+              <caret line="953" column="45" selection-start-line="953" selection-start-column="33" selection-end-line="953" selection-end-column="45" />
               <folding>
                 <element signature="imports" expanded="true" />
                 <element signature="docComment;class#FvmFacadeImpl#0" />
@@ -89,8 +89,8 @@
                 <element signature="method#interleave#1;class#FvmFacadeImpl#0" />
                 <element signature="e#5050#5051#0" expanded="true" />
                 <element signature="e#5101#5102#0" expanded="true" />
-                <element signature="method#product#0;class#FvmFacadeImpl#0" />
-                <element signature="method#programGraphFromNanoPromela#0;class#FvmFacadeImpl#0" />
+                <element signature="e#43093#43109#0" expanded="true" />
+                <element signature="e#42388#42404#0" expanded="true" />
                 <element signature="method#programGraphFromNanoPromelaString#0;class#FvmFacadeImpl#0" />
                 <element signature="method#programGraphFromNanoPromela#1;class#FvmFacadeImpl#0" />
                 <element signature="method#verifyAnOmegaRegularProperty#0;class#FvmFacadeImpl#0" />
@@ -139,7 +139,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/ProgramGraphImpl.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="550">
+            <state relative-caret-position="1750">
               <caret line="106" column="34" selection-start-line="106" selection-start-column="11" selection-end-line="106" selection-end-column="34" />
               <folding>
                 <element signature="imports" expanded="true" />
@@ -299,7 +299,7 @@
       <option name="presentableId" value="Default" />
       <updated>1542222379650</updated>
       <workItem from="1542222382730" duration="6601000" />
-      <workItem from="1542370245952" duration="27825000" />
+      <workItem from="1542370245952" duration="29936000" />
     </task>
     <task id="LOCAL-00001" summary="added dependencies">
       <created>1542376019757</created>
@@ -343,11 +343,25 @@
       <option name="project" value="LOCAL" />
       <updated>1542418377707</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="implemented transitionSystemFromChannelSystem method">
+      <created>1542460715844</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1542460715844</updated>
+    </task>
+    <task id="LOCAL-00008" summary="implemented product method">
+      <created>1542461185302</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1542461185302</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="34426000" />
+    <option name="totallyTimeSpent" value="36537000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
@@ -411,7 +425,9 @@
     <MESSAGE value="implemented interleave method" />
     <MESSAGE value="implemented transitionSystemFromCircuit method" />
     <MESSAGE value="implemented transitionSystemFromProgramGraph method" />
-    <option name="LAST_COMMIT_MESSAGE" value="implemented transitionSystemFromProgramGraph method" />
+    <MESSAGE value="implemented transitionSystemFromChannelSystem method" />
+    <MESSAGE value="implemented product method" />
+    <option name="LAST_COMMIT_MESSAGE" value="implemented product method" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/../HW-Definitions/out/production/HW-Definitions/il/ac/bgu/cs/fvm/automata/Automaton.class">
@@ -548,7 +564,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/ProgramGraphImpl.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="550">
+        <state relative-caret-position="1750">
           <caret line="106" column="34" selection-start-line="106" selection-start-column="11" selection-end-line="106" selection-end-column="34" />
           <folding>
             <element signature="imports" expanded="true" />
@@ -574,8 +590,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/il/ac/bgu/cs/fvm/impl/FvmFacadeImpl.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="518">
-          <caret line="702" column="79" selection-start-line="702" selection-start-column="72" selection-end-line="702" selection-end-column="79" />
+        <state relative-caret-position="368">
+          <caret line="953" column="45" selection-start-line="953" selection-start-column="33" selection-end-line="953" selection-end-column="45" />
           <folding>
             <element signature="imports" expanded="true" />
             <element signature="docComment;class#FvmFacadeImpl#0" />
@@ -600,8 +616,8 @@
             <element signature="method#interleave#1;class#FvmFacadeImpl#0" />
             <element signature="e#5050#5051#0" expanded="true" />
             <element signature="e#5101#5102#0" expanded="true" />
-            <element signature="method#product#0;class#FvmFacadeImpl#0" />
-            <element signature="method#programGraphFromNanoPromela#0;class#FvmFacadeImpl#0" />
+            <element signature="e#43093#43109#0" expanded="true" />
+            <element signature="e#42388#42404#0" expanded="true" />
             <element signature="method#programGraphFromNanoPromelaString#0;class#FvmFacadeImpl#0" />
             <element signature="method#programGraphFromNanoPromela#1;class#FvmFacadeImpl#0" />
             <element signature="method#verifyAnOmegaRegularProperty#0;class#FvmFacadeImpl#0" />

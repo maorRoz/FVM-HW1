@@ -11,6 +11,11 @@ import il.ac.bgu.cs.fvm.programgraph.ConditionDef;
 import il.ac.bgu.cs.fvm.channelsystem.ParserBasedInterleavingActDef;
 import il.ac.bgu.cs.fvm.programgraph.PGTransition;
 import il.ac.bgu.cs.fvm.programgraph.ProgramGraph;
+import il.ac.bgu.cs.fvm.nanopromela.NanoPromelaFileReader;
+import il.ac.bgu.cs.fvm.nanopromela.NanoPromelaParser.DostmtContext;
+import il.ac.bgu.cs.fvm.nanopromela.NanoPromelaParser.IfstmtContext;
+import il.ac.bgu.cs.fvm.nanopromela.NanoPromelaParser.OptionContext;
+import il.ac.bgu.cs.fvm.nanopromela.NanoPromelaParser.StmtContext;
 import il.ac.bgu.cs.fvm.channelsystem.InterleavingActDef;
 import il.ac.bgu.cs.fvm.programgraph.ParserBasedActDef;
 import il.ac.bgu.cs.fvm.programgraph.ParserBasedCondDef;
@@ -792,9 +797,238 @@ public class FvmFacadeImpl implements FvmFacade {
         return productTransitionSystem;
     }
 
+    private String getNewNekudaPsikStateFromFirstAndLastsStmts(String first, String lastsStatements) {
+        String res = first;
+        if(!res.isEmpty())
+            res += ";";
+        res += lastsStatements;
+        return res;
+    }
+
+    private String turnToNanoPromelaString(String loc)
+    {
+        String res = "";
+        for(int i = 0; i < loc.length() ; i++)
+        {
+            if(i+1 < loc.length() && ((loc.charAt(i) == 'o' && loc.charAt(i + 1) == 'd') || (loc.charAt(i) == 'f' && loc.charAt(i + 1) == 'i')))
+            {
+                if(!(i+2 < loc.length() && loc.substring(i-1, i+3).equals("soda")))
+                {
+                    res += " " + loc.charAt(i) + loc.charAt(i + 1);
+                    i++;
+                }
+                else
+                    res += loc.charAt(i);
+            }
+            else
+                res += loc.charAt(i);
+        }
+        return res;
+    }
+
+    private void runNewLocs(ProgramGraph<String, String> pg, Set<String> originalLocations) {
+        Set<String> updatedLocations = new HashSet<>(pg.getLocations());
+        for(String location : updatedLocations)
+            if(!originalLocations.contains(location))
+                programGraphFromRootHelp(pg, NanoPromelaFileReader.pareseNanoPromelaString(turnToNanoPromelaString(location)));
+    }
+
+    private void getOriginalPGFromSubPG(ProgramGraph<String, String> pg,
+                                        StmtContext rootStmt, String cond, StmtContext firstState,
+                                        ProgramGraph<String, String> firstStatementPG,
+                                        String lastsStatements) {
+        for(PGTransition<String, String> firstPGTrans : firstStatementPG.getTransitions())
+        {
+            String fromState = rootStmt.getText();
+            String newCond = firstPGTrans.getCondition();
+            if(!firstPGTrans.getFrom().equals(firstState.getText()))
+            {
+                fromState = getNewNekudaPsikStateFromFirstAndLastsStmts(firstPGTrans.getFrom(), lastsStatements);
+                pg.addLocation(fromState);
+            }
+            else
+            {
+                if(!cond.isEmpty())
+                {
+                    if(!newCond.isEmpty())
+                        newCond = cond + " && (" + newCond;
+                    else
+                        newCond = cond;
+                }
+            }
+            String toState = getNewNekudaPsikStateFromFirstAndLastsStmts(firstPGTrans.getTo(), lastsStatements);
+            pg.addLocation(toState);
+
+            newCond = addClosingParanToCond(newCond);
+            PGTransition<String, String> newTransForOriginalPG = new PGTransition<String, String>(fromState, newCond, firstPGTrans.getAction(), toState);
+            pg.addTransition(newTransForOriginalPG);
+        }
+    }
+
+    private void handleAllDoOptionsDontExist(ProgramGraph<String, String> programGraph,
+                                             StmtContext rootStmt, String condition, List<OptionContext> options) {
+        String newCondition = condition;
+        if(!newCondition.isEmpty())
+            newCondition += " && (";
+        newCondition += "!(";
+        for(int i = 0; i < options.size(); i++)
+        {
+            newCondition = newCondition + "(" + options.get(i).boolexpr().getText() + ")";
+            if(i < options.size() - 1)
+                newCondition += "||";
+        }
+        newCondition = addClosingParanToCond(newCondition);
+        PGTransition<String, String> newTrans = new PGTransition<String, String>(rootStmt.getText(), newCondition, "", "");
+        programGraph.addTransition(newTrans);
+    }
+
+    private String addClosingParanToCond(String s)
+    {
+        String res = s;
+        int countOpen = 0;
+        for(int i = 0; i < s.length(); i++)
+        {
+            if(s.charAt(i) == '(')
+                countOpen++;
+            else if(s.charAt(i) == ')')
+                countOpen--;
+        }
+
+        for(int i = 0 ; i < countOpen; i++)
+        {
+            res += ")";
+        }
+        return res;
+    }
+
+    private void handleIfDoStmt(ProgramGraph<String, String> programGraph, StmtContext rootStmt, StmtContext child, String condition)
+    {
+        if(isSimpleStmt(child))
+        {
+            condition = addClosingParanToCond(condition);
+            PGTransition<String, String> newTrans = new PGTransition<>(rootStmt.getText(), condition, child.getText(), "");
+            programGraph.addTransition(newTrans);
+        }
+        else if(child.ifstmt() != null)
+        {
+            IfstmtContext ifStmt = child.ifstmt();
+            List<OptionContext> options = ifStmt.option();
+            String newCondition = condition;
+            if(!newCondition.isEmpty())
+                newCondition += " && (";
+            for(OptionContext opt : options)
+            {
+                handleIfDoStmt(programGraph, rootStmt, opt.stmt(), newCondition + "(" + opt.boolexpr().getText() + ")");
+            }
+        }
+        else if(child.dostmt() != null)
+        {
+            DostmtContext doStmt = child.dostmt();
+            List<OptionContext> options = doStmt.option();
+
+            Set<String> originalLocations = new HashSet<>(programGraph.getLocations());
+            //add all option dont exist
+            handleAllDoOptionsDontExist(programGraph, rootStmt, condition, options);
+
+            for(OptionContext opt : options)
+            {
+                ProgramGraph<String, String> optPG = programGraphFromRoot(opt.stmt());
+                String newCondition = condition;
+                if(!newCondition.isEmpty() && !opt.boolexpr().getText().isEmpty())
+                    newCondition += " && (";
+                newCondition += "(" + opt.boolexpr().getText() + ")";
+                newCondition = addClosingParanToCond(newCondition);
+                getOriginalPGFromSubPG(programGraph, rootStmt, newCondition, opt.stmt(), optPG, doStmt.getText());
+            }
+            runNewLocs(programGraph, originalLocations);
+        }
+        else if (child.stmt() != null)
+        {
+            condition = addClosingParanToCond(condition);
+            handleNekudaPsikStatement(programGraph, rootStmt, child, condition);
+        }
+    }
+
+    private StmtContext getFirstStmt(StmtContext s)
+    {
+        StmtContext res = s;
+        while(res.stmt() != null && !res.stmt().isEmpty())
+            res = res.stmt().get(0);
+        return res;
+    }
+
+    private List<StmtContext> getRestStmts(StmtContext s)
+    {
+        List<StmtContext> res = new ArrayList<StmtContext>();
+        StmtContext iterator = s;
+        while(iterator.stmt() != null && !iterator.stmt().isEmpty())
+        {
+            res.add(0, iterator.stmt().get(1));
+            iterator = iterator.stmt().get(0);
+        }
+        return res;
+    }
+
+    private String turnStmtsToString(List<StmtContext> stmts)
+    {
+        String res = stmts.get(0).getText();
+        for(int i = 1; i < stmts.size(); i++)
+        {
+            res = res + ";" + stmts.get(i).getText();
+        }
+        return res;
+    }
+
+    private void handleNekudaPsikStatement(ProgramGraph<String, String> programGraph,
+                                           StmtContext rootStmt, StmtContext child, String condition) {
+        StmtContext firstState = getFirstStmt(child);
+        List<StmtContext> restStmts = getRestStmts(child);
+        ProgramGraph<String, String> firstStatementPG = programGraphFromRoot(firstState);
+        String lastsStatementsString = turnStmtsToString(restStmts);
+        Set<String> originalLocations = new HashSet<>(programGraph.getLocations());
+        getOriginalPGFromSubPG(programGraph, rootStmt, condition, firstState, firstStatementPG, lastsStatementsString);
+        runNewLocs(programGraph, originalLocations);
+    }
+
+
+    private boolean isSimpleStmt(StmtContext stmt)
+    {
+        return stmt.assstmt() != null || stmt.atomicstmt() != null || stmt.chanreadstmt() != null || stmt.chanwritestmt() != null || stmt.skipstmt() != null;
+    }
+
+    private void programGraphFromRootHelp(ProgramGraph<String, String> programGraph, StmtContext root)
+    {
+        if(isSimpleStmt(root))
+        {
+            PGTransition<String, String> newTransition = new PGTransition<>(root.getText(), "", root.getText(), "");
+            programGraph.addTransition(newTransition);
+        }
+        else if(root.ifstmt() != null || root.dostmt() != null)
+        {
+            handleIfDoStmt(programGraph, root, root, "");
+        }
+        else if(root.stmt() != null)
+        {
+            handleNekudaPsikStatement(programGraph, root, root, "");
+        }
+    }
+
+    private ProgramGraph<String, String> programGraphFromRoot(StmtContext root)
+    {
+        ProgramGraph<String, String> programGraph =  createProgramGraph();
+        programGraph.addLocation(root.getText());
+        programGraph.setInitial(root.getText(), true);
+        programGraph.addLocation("");
+
+        programGraphFromRootHelp(programGraph, root);
+        return programGraph;
+    }
+
     @Override
     public ProgramGraph<String, String> programGraphFromNanoPromela(String filename) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromela
+        StmtContext stmtContext = NanoPromelaFileReader.pareseNanoPromelaFile(filename);
+        ProgramGraph<String, String> programGraph = programGraphFromRoot(stmtContext);
+        return programGraph;
     }
 
     @Override
