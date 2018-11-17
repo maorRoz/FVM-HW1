@@ -699,13 +699,97 @@ public class FvmFacadeImpl implements FvmFacade {
         return transitionSystem;
     }
 
+    private <Sts, Saut, A, P> void addLabelsToProduct(TransitionSystem<Pair<Sts, Saut>, A, Saut> productTransitionSystem)
+    {
+        for(Pair<Sts, Saut> sts : productTransitionSystem.getStates())
+        {
+            Saut labelToAdd = sts.getSecond();
+            productTransitionSystem.addAtomicProposition(labelToAdd);
+            productTransitionSystem.addToLabel(sts, labelToAdd);
+        }
+    }
+
+    private <Sts, Saut, A, P> void createProductFromInitialStates(TransitionSystem<Pair<Sts, Saut>, A, Saut> productTransitionSystem,
+                                                                 TransitionSystem<Sts, A, P> transitionSystem, Automaton<Saut, P> automaton)
+    {
+        Map<Sts, Set<P>> transitionSystemLabelingFunction = transitionSystem.getLabelingFunction();
+        Set<Transition<Sts, A>> transitionSystemTransitions = transitionSystem.getTransitions();
+        Map<Saut, Map<Set<P>, Set<Saut>>> automatonTransitions = automaton.getTransitions();
+        Deque<Pair<Sts, Saut>> queue = new LinkedList<>(productTransitionSystem.getInitialStates());
+        Set<Pair<Sts, Saut>> allReadyChecked = new HashSet<>(productTransitionSystem.getInitialStates());
+        while(!queue.isEmpty())
+        {
+            Pair<Sts, Saut> stateToCheck = queue.removeFirst();
+            for(Transition<Sts, A> tsTrans : transitionSystemTransitions)
+            {
+                if(tsTrans.getFrom().equals(stateToCheck.getFirst()))
+                {
+                    A action = tsTrans.getAction();
+                    Sts tsToState = tsTrans.getTo();
+                    Set<P> labelTsToState =  transitionSystemLabelingFunction.get(tsToState) != null ? transitionSystemLabelingFunction.get(tsToState) :
+                            new HashSet<>();
+                    Saut autFromState = stateToCheck.getSecond();
+
+                    //check if there is a transition from autState with action which is the label of tsState
+                    if(automatonTransitions.containsKey(autFromState) &&
+                            automatonTransitions.get(autFromState).containsKey(labelTsToState))
+                    {
+                        Set<Saut> autToStates = automatonTransitions.get(autFromState).get(labelTsToState);
+                        for(Saut autToState : autToStates)
+                        {
+                            Pair<Sts, Saut> newSts = new Pair<>(tsToState, autToState);
+                            if(!allReadyChecked.contains(newSts))
+                            {
+                                allReadyChecked.add(newSts);
+                                queue.addLast(newSts);
+                                productTransitionSystem.addState(newSts);
+                            }
+                            productTransitionSystem.addAction(action);
+                            Transition<Pair<Sts, Saut>, A> transToAdd = new Transition<>(stateToCheck, action , newSts);
+                            productTransitionSystem.addTransition(transToAdd);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private <Sts, Saut, A, P> void createProductInitialStates(TransitionSystem<Pair<Sts, Saut>, A, Saut> productTransitionSystem,
+                                                             TransitionSystem<Sts, A, P> transitionSystem, Automaton<Saut, P> automaton)
+    {
+        Set<Sts> tsInitials = transitionSystem.getInitialStates();
+        Map<Sts, Set<P>> transitionSystemLabelingFunction = transitionSystem.getLabelingFunction();
+        Set<Saut> automatonInitials = automaton.getInitialStates();
+        Map<Saut, Map<Set<P>, Set<Saut>>> automatonTransitions = automaton.getTransitions();
+
+        for(Sts tsState : tsInitials)
+        {
+            Set<P> transitionSystemLabel = transitionSystemLabelingFunction.get(tsState) != null ? transitionSystemLabelingFunction.get(tsState) : new HashSet<P>();
+            for(Saut automatonState: automatonInitials)
+            {
+                //check if there is a transition from autState with action which is the label of tsState
+                if(automatonTransitions.containsKey(automatonState) && automatonTransitions.get(automatonState).containsKey(transitionSystemLabel))
+                {
+                    Set<Saut> toStates = automatonTransitions.get(automatonState).get(transitionSystemLabel);
+                    for(Saut toState : toStates)
+                    {
+                        Pair<Sts, Saut> newSts = new Pair<>(tsState, toState);
+                        productTransitionSystem.addState(newSts);
+                        productTransitionSystem.setInitial(newSts, true);
+                    }
+                }
+            }
+        }
+    }
+
     @Override
-    public <Sts, Saut, A, P> TransitionSystem<Pair<Sts, Saut>, A, Saut> product(TransitionSystem<Sts, A, P> ts, Automaton<Saut, P> aut) {
-        TransitionSystem<Pair<Sts, Saut>, A, Saut> res = createTransitionSystem();
-        createProductInitialStates(res, ts, aut);
-        createProductFromInitialStates(res, ts, aut);
-        addLabelsToProduct(res);
-        return res;
+    public <Sts, Saut, A, P> TransitionSystem<Pair<Sts, Saut>, A, Saut> product(TransitionSystem<Sts, A, P> transitionSystem,
+                                                                                Automaton<Saut, P> automaton) {
+        TransitionSystem<Pair<Sts, Saut>, A, Saut> productTransitionSystem = createTransitionSystem();
+        createProductInitialStates(productTransitionSystem, transitionSystem, automaton);
+        createProductFromInitialStates(productTransitionSystem, transitionSystem, automaton);
+        addLabelsToProduct(productTransitionSystem);
+        return productTransitionSystem;
     }
 
     @Override
