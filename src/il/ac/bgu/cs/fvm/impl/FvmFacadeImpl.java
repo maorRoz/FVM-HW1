@@ -5,6 +5,8 @@ import il.ac.bgu.cs.fvm.automata.Automaton;
 import il.ac.bgu.cs.fvm.automata.MultiColorAutomaton;
 import il.ac.bgu.cs.fvm.channelsystem.ChannelSystem;
 import il.ac.bgu.cs.fvm.circuits.Circuit;
+import il.ac.bgu.cs.fvm.exceptions.ActionNotFoundException;
+import il.ac.bgu.cs.fvm.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.fvm.ltl.LTL;
 import il.ac.bgu.cs.fvm.programgraph.ActionDef;
 import il.ac.bgu.cs.fvm.programgraph.ConditionDef;
@@ -14,13 +16,9 @@ import il.ac.bgu.cs.fvm.transitionsystem.Transition;
 import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.fvm.util.Pair;
 import il.ac.bgu.cs.fvm.verification.VerificationResult;
-import org.svvrl.goal.core.aut.Run;
 
 import java.io.InputStream;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Implement the methods in this class. You may add additional classes as you
@@ -35,38 +33,82 @@ public class FvmFacadeImpl implements FvmFacade {
     }
 
     @Override
-    public <S, A, P> boolean isActionDeterministic(TransitionSystem<S, A, P> ts) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isActionDeterministic
+    public <S, A, P> boolean isActionDeterministic(TransitionSystem<S, A, P> transitionSystem) {
+        if(transitionSystem.getInitialStates().size() > 1){
+            return false;
+        }
+        for(S state: transitionSystem.getStates()){
+            for(A action: transitionSystem.getActions()){
+                if(post(transitionSystem, state, action).size() > 1){
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
+    /**
+     * change this function implementation
+     */
     @Override
-    public <S, A, P> boolean isAPDeterministic(TransitionSystem<S, A, P> ts) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isAPDeterministic
+    public <S, A, P> boolean isAPDeterministic(TransitionSystem<S, A, P> transitionSystem) {
+        if(transitionSystem.getInitialStates().size() > 1){
+            return false;
+        }
+        Map<S, Set<P>> stateToLabel  = transitionSystem.getLabelingFunction();
+        Map<S, Set<P>> stateToLabelOfPostStets = new HashMap<>();
+        for(S state: transitionSystem.getStates()) {
+            stateToLabelOfPostStets.put(state, stateToLabel.get(state));
+        }
+        return true;
     }
 
     @Override
     public <S, A, P> boolean isExecution(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isExecution
+        return isInitialExecutionFragment(ts,e) && isMaximalExecutionFragment(ts, e);
     }
 
     @Override
-    public <S, A, P> boolean isExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isExecutionFragment
+    public <S, A, P> boolean isExecutionFragment(TransitionSystem<S, A, P> transitionSystem, AlternatingSequence<S, A> e) {
+        if(e.isEmpty() || e.size() == 1){
+            return true;
+        }
+        if(!transitionSystem.getStates().contains(e.head())){
+            throw new StateNotFoundException("State doesn't exist in the transition system!");
+        }
+        if(!transitionSystem.getActions().contains(e.tail().head())){
+            throw new ActionNotFoundException("Action doesn't exist in the transition system!");
+        }
+        if(!e.tail().tail().isEmpty()){
+            if(!transitionSystem.getStates().contains(e.tail().tail().head())){
+                throw new StateNotFoundException("State doesn't exist in the transition system!");
+            }
+            for(Transition<S,A> transition: transitionSystem.getTransitions()){
+                if(transition.getFrom().equals(e.head()) && transition.getAction().equals(e.tail().head()) &&
+                transition.getTo().equals(e.tail().tail().head())){
+                    return isExecutionFragment(transitionSystem, e.tail().tail());
+                }
+            }
+        }
+        return false;
     }
 
     @Override
-    public <S, A, P> boolean isInitialExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isInitialExecutionFragment
+    public <S, A, P> boolean isInitialExecutionFragment(TransitionSystem<S, A, P> transitionSystem, AlternatingSequence<S, A> e) {
+        return transitionSystem.getInitialStates().contains(e.head()) && isExecutionFragment(transitionSystem, e);
     }
 
     @Override
-    public <S, A, P> boolean isMaximalExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isMaximalExecutionFragment
+    public <S, A, P> boolean isMaximalExecutionFragment(TransitionSystem<S, A, P> transitionSystem, AlternatingSequence<S, A> e) {
+        return isStateTerminal(transitionSystem, e.last()) && isExecutionFragment(transitionSystem, e);
     }
 
     @Override
-    public <S, A> boolean isStateTerminal(TransitionSystem<S, A, ?> ts, S s) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement isStateTerminal
+    public <S, A> boolean isStateTerminal(TransitionSystem<S, A, ?> transitionSystem, S state) {
+        if(!transitionSystem.getStates().contains(state)){
+            throw new StateNotFoundException("The state wasn't found in the transition system!");
+        }
+        return post(transitionSystem,state).isEmpty();
     }
 
     @Override
@@ -154,18 +196,71 @@ public class FvmFacadeImpl implements FvmFacade {
     }
 
     @Override
-    public <S, A> Set<S> reach(TransitionSystem<S, A, ?> ts) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement reach
+    public <S, A> Set<S> reach(TransitionSystem<S, A, ?> transitionSystem) {
+        Set<S> reachableStates = transitionSystem.getInitialStates();
+        Set<S> statesToCheck = transitionSystem.getInitialStates();
+        while(statesToCheck.size() > 0){
+            for(S state: statesToCheck){
+                for (S postState : post(transitionSystem, state)){
+                    if(!reachableStates.contains(postState)){
+                        reachableStates.add(postState);
+                    }
+                    if(!statesToCheck.contains(postState)){
+                        statesToCheck.add(postState);
+                    }
+                }
+                statesToCheck.remove(state);
+            }
+        }
+        return reachableStates;
     }
 
     @Override
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
+        return interleave(ts1, ts2, new HashSet<>());
+    }
+
+    private <S1, S2, A, P> void createInitialStates(TransitionSystem<Pair<S1, S2>, A, P> interleave,
+                                     TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2){
+        for(S1 state1 : transitionSystem1.getInitialStates()){
+            for(S2 state2 : transitionSystem2.getInitialStates()){
+                Pair<S1,S2> state = new Pair<>(state1, state2);
+                interleave.addState(state);
+                interleave.setInitial(state, true);
+            }
+        }
+    }
+
+    private <S1, S2, A, P> void createAtomicPropositions(TransitionSystem<Pair<S1, S2>, A, P> interleave,
+                                          TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2){
+        for (P atomicProp: transitionSystem1.getAtomicPropositions()){
+            interleave.addAtomicProposition(atomicProp);
+        }
+        for(P atomicProp: transitionSystem2.getAtomicPropositions()){
+            interleave.addAtomicProposition(atomicProp);
+        }
+        for(Pair<S1,S2> state : interleave.getStates()){
+            Set<P> atomicPropositionOfFirst = transitionSystem1.getLabel(state.getFirst());
+            Set<P> atomicPropositionOfSecond = transitionSystem2.getLabel(state.getSecond());
+            for(P atomicProp1 : atomicPropositionOfFirst){
+                interleave.addToLabel(state, atomicProp1);
+            }
+            for(P atomicProp2: atomicPropositionOfSecond){
+                interleave.addToLabel(state, atomicProp2);
+            }
+        }
     }
 
     @Override
-    public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2, Set<A> handShakingActions) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
+    public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2, Set<A> handShakingActions) {
+        TransitionSystem<Pair<S1, S2>, A, P> resultInterleave = createTransitionSystem();
+        resultInterleave.setName(transitionSystem1.getName() + transitionSystem2.getName());
+        resultInterleave.addAllActions(transitionSystem1.getActions());
+        resultInterleave.addAllActions(transitionSystem2.getActions());
+        createInitialStates(resultInterleave, transitionSystem1, transitionSystem2);
+        //to deal with the hand shaking
+        createAtomicPropositions(resultInterleave, transitionSystem1, transitionSystem2);
+        return resultInterleave;
     }
 
     @Override
@@ -199,17 +294,17 @@ public class FvmFacadeImpl implements FvmFacade {
     }
 
     @Override
-    public ProgramGraph<String, String> programGraphFromNanoPromela(String filename) throws Exception {
+    public ProgramGraph<String, String> programGraphFromNanoPromela(String filename) {
         throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromela
     }
 
     @Override
-    public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) throws Exception {
+    public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) {
         throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromelaString
     }
 
     @Override
-    public ProgramGraph<String, String> programGraphFromNanoPromela(InputStream inputStream) throws Exception {
+    public ProgramGraph<String, String> programGraphFromNanoPromela(InputStream inputStream) {
         throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromela
     }
 
