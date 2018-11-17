@@ -10,12 +10,14 @@ import il.ac.bgu.cs.fvm.programgraph.ActionDef;
 import il.ac.bgu.cs.fvm.programgraph.ConditionDef;
 import il.ac.bgu.cs.fvm.programgraph.ProgramGraph;
 import il.ac.bgu.cs.fvm.transitionsystem.AlternatingSequence;
+import il.ac.bgu.cs.fvm.transitionsystem.Transition;
 import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.fvm.util.Pair;
 import il.ac.bgu.cs.fvm.verification.VerificationResult;
 import org.svvrl.goal.core.aut.Run;
 
 import java.io.InputStream;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,23 +70,49 @@ public class FvmFacadeImpl implements FvmFacade {
     }
 
     @Override
-    public <S> Set<S> post(TransitionSystem<S, ?, ?> ts, S s) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement post
+    public <S> Set<S> post(TransitionSystem<S, ?, ?> transitionSystem, S state) {
+        Set<S> postStatesResults = new HashSet<>();
+        for(Transition<S, ?> transition: transitionSystem.getTransitions()){
+            if(transition.getFrom().equals(state)){
+                postStatesResults.add(transition.getTo());
+            }
+        }
+        return postStatesResults;
     }
 
     @Override
-    public <S> Set<S> post(TransitionSystem<S, ?, ?> ts, Set<S> c) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement post
+    public <S> Set<S> post(TransitionSystem<S, ?, ?> transitionSystem, Set<S> c) {
+        Set<S> postStatesResults = new HashSet<>();
+        for(S state: c){
+            Set<S> postStatesPerState = post(transitionSystem, state);
+            for (S postStates: postStatesPerState){
+                postStatesResults.add(postStates);
+            }
+        }
+        return postStatesResults;
     }
 
     @Override
-    public <S, A> Set<S> post(TransitionSystem<S, A, ?> ts, S s, A a) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement post
+    public <S, A> Set<S> post(TransitionSystem<S, A, ?> transitionSystem, S state, A action) {
+        Set<S> postStates = new HashSet<>();
+        for(Transition<S, A> transitions: transitionSystem.getTransitions() ){
+            if(transitions.getFrom().equals(state) && transitions.getAction().equals(action)){
+                postStates.add(transitions.getTo());
+            }
+        }
+        return postStates;
     }
 
     @Override
-    public <S, A> Set<S> post(TransitionSystem<S, A, ?> ts, Set<S> c, A a) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement post
+    public <S, A> Set<S> post(TransitionSystem<S, A, ?> transitionSystem, Set<S> c, A action) {
+        Set<S> postStatesResults = new HashSet<>();
+        for(S state: c){
+            Set<S> postStatesPerState = post(transitionSystem, state, action);
+            for (S postStates: postStatesPerState){
+                postStatesResults.add(postStates);
+            }
+        }
+        return postStatesResults;
     }
 
     @Override
