@@ -8,8 +8,10 @@ import il.ac.bgu.cs.fvm.circuits.Circuit;
 import il.ac.bgu.cs.fvm.ltl.LTL;
 import il.ac.bgu.cs.fvm.programgraph.ActionDef;
 import il.ac.bgu.cs.fvm.programgraph.ConditionDef;
+import il.ac.bgu.cs.fvm.channelsystem.ParserBasedInterleavingActDef;
 import il.ac.bgu.cs.fvm.programgraph.PGTransition;
 import il.ac.bgu.cs.fvm.programgraph.ProgramGraph;
+import il.ac.bgu.cs.fvm.channelsystem.InterleavingActDef;
 import il.ac.bgu.cs.fvm.programgraph.ParserBasedActDef;
 import il.ac.bgu.cs.fvm.programgraph.ParserBasedCondDef;
 import il.ac.bgu.cs.fvm.transitionsystem.AlternatingSequence;
@@ -401,17 +403,8 @@ public class FvmFacadeImpl implements FvmFacade {
                                                     ProgramGraph<L, A> programGraph, Set<ActionDef> actionDefinitions)
     {
         Set<List<String>> variableInitiationSet = programGraph.getInitalizations();
-        Set<Map<String, Object>> evaluations = new HashSet<>();
+        Set<Map<String, Object>> evaluations = getMapsFromInitializations(variableInitiationSet, actionDefinitions);
         Set<L> initialLocations = programGraph.getInitialLocations();
-
-        for(List<String> variableInitiation : variableInitiationSet)
-        {
-            Map<String, Object> variableInitiationMap = new HashMap<>();
-            for(String action : variableInitiation)
-                variableInitiationMap = ActionDef.effect(actionDefinitions, variableInitiationMap, action);
-            evaluations.add(variableInitiationMap);
-        }
-
 
         for(L l : initialLocations)
         {
@@ -452,33 +445,267 @@ public class FvmFacadeImpl implements FvmFacade {
         return transitionSystem;
     }
 
-    private <L,A> void addInitialStateTSFromCS(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> ts, ChannelSystem<L, A> cs, Set<ActionDef> effect)
+    private <L,A> void addLabelsToTransitionSystemFromChannelSystem(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystem)
     {
-        List<L> newInitLocs = new ArrayList<L>();
-        List<List<String>> allInitializations = new ArrayList<List<String>>();
-        getAllInitializationsFromCS(cs, allInitializations, 0, new ArrayList<String>()); //into allInitializations
-        Set<Map<String, Object>> allEvals = getAllMapsFromInitializations(allInitializations, effect);
-        addInitialStatesTSFromCSHelp(ts, cs, newInitLocs, allEvals);
+        for(Pair<List<L>, Map<String, Object>> state : transitionSystem.getStates())
+        {
+            for(L location: state.getFirst())
+            {
+                transitionSystem.addToLabel(state, location.toString());
+            }
+            for(String var : state.second.keySet())
+            {
+                String newAtomicPreposition = var + " = " + state.second.get(var).toString();
+                transitionSystem.addToLabel(state,newAtomicPreposition);
+            }
+        }
+    }
+
+    private <L,A> void addAtomicPropositionToTransitionSystemFromChannelSystem(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystem)
+    {
+        for(Pair<List<L>, Map<String, Object>> state : transitionSystem.getStates())
+        {
+            for(L location: state.getFirst())
+            {
+                transitionSystem.addAtomicProposition(location.toString());
+            }
+
+            for(String variable : state.second.keySet())
+            {
+                String newAtomicPreposition = variable + " = " + state.second.get(variable).toString();
+                transitionSystem.addAtomicProposition(newAtomicPreposition);
+            }
+        }
+    }
+
+    private String getQueueNameFromOneSidedAction(String oneSidedAction)
+    {
+        int breakIndex = 0;
+        for(int i = 0; i < oneSidedAction.length(); i++)
+        {
+            if(oneSidedAction.charAt(i) == '!' || oneSidedAction.charAt(i) == '?')
+                breakIndex = i;
+        }
+        return oneSidedAction.substring(0, breakIndex);
+    }
+
+    private <L, A> void addStateIfNeeded(
+            TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> ts,
+            Deque<Pair<List<L>, Map<String, Object>>> queue,
+            Set<Pair<List<L>, Map<String, Object>>> allReadyChecked,
+            Pair<List<L>, Map<String, Object>> toState) {
+        if(!allReadyChecked.contains(toState))
+        {
+            ts.addState(toState);
+            allReadyChecked.add(toState);
+            queue.addLast(toState);
+        }
+    }
+
+    private <L,A> Map<Integer, Set<PGTransition<L, A>>> getAllOneSidedActionTransFromAllTrans(Map<Integer, Set<PGTransition<L, A>>> allProgramGraphTransMap,
+                                                                                              String readOrWrite)
+    {
+        InterleavingActDef channelActionDef = new ParserBasedInterleavingActDef();
+        Map<Integer, Set<PGTransition<L, A>>> res = new HashMap<>();
+        for(int i = 0; i < allProgramGraphTransMap.size(); i++)
+        {
+            Set<PGTransition<L, A>> programGraphOneSidedTrans = new HashSet<>();
+            for(PGTransition<L, A> programGraphTrans : allProgramGraphTransMap.get(i))
+            {
+                if(channelActionDef.isOneSidedAction(programGraphTrans.getAction().toString()) &&
+                        programGraphTrans.getAction().toString().contains(readOrWrite))
+                    programGraphOneSidedTrans.add(programGraphTrans);
+            }
+            res.put(i, programGraphOneSidedTrans);
+        }
+        return res;
+    }
+
+    private <L, A> Set<PGTransition<L, A>> getAllTransitionsFromLoc(Set<PGTransition<L, A>> transitions, L loc)
+    {
+        Set<PGTransition<L, A>> transitionFromLocation = new HashSet<>();
+        for(PGTransition<L, A> programGraphTransition : transitions)
+        {
+            if(programGraphTransition.getFrom().equals(loc))
+            {
+                transitionFromLocation.add(programGraphTransition);
+            }
+        }
+        return transitionFromLocation;
+    }
+
+    private <L, A> Map<Integer, Set<PGTransition<L, A>>> programGraphsTransitionMapFromState(List<ProgramGraph<L, A>> programGraphs, Pair<List<L>, Map<String, Object>> fromState)
+    {
+        Map<Integer, Set<PGTransition<L, A>>> programGraphsTransitionMap = new HashMap<>();
+        for(int i = 0; i < programGraphs.size(); i++)
+        {
+            ProgramGraph<L, A> currentProgramGraph = programGraphs.get(i);
+            L locOfCurrPG = fromState.getFirst().get(i);
+            Set<PGTransition<L, A>> currPGTransitions = getAllTransitionsFromLoc(currentProgramGraph.getTransitions(), locOfCurrPG);
+            programGraphsTransitionMap.put(i, currPGTransitions);
+        }
+        return programGraphsTransitionMap;
+    }
+
+    private <L, A>void transitionSystemFromCSFromInitialStates(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystem,
+                         ChannelSystem<L, A> channelSystem, Set<ActionDef> effects, Set<ConditionDef> condition)
+    {
+        InterleavingActDef channelActionDef = new ParserBasedInterleavingActDef();
+        Deque<Pair<List<L>, Map<String, Object>>> queue = new LinkedList<>(transitionSystem.getInitialStates());
+        Set<Pair<List<L>, Map<String, Object>>> allReadyChecked = new HashSet<>(transitionSystem.getInitialStates());
+        while(!queue.isEmpty())
+        {
+            Pair<List<L>, Map<String, Object>> fromState = queue.removeFirst();
+            Map<Integer, Set<PGTransition<L, A>>> allPGTransMap = programGraphsTransitionMapFromState(channelSystem.getProgramGraphs(), fromState);
+            Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransMapRead = getAllOneSidedActionTransFromAllTrans(allPGTransMap, "?");
+            Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransMapWrite = getAllOneSidedActionTransFromAllTrans(allPGTransMap, "!");
+            for(int i = 0; i < allPGTransMap.size(); i++)
+            {
+                for(PGTransition<L, A> pgTrans : allPGTransMap.get(i))
+                {
+                    String currAction = pgTrans.getAction().toString();
+                    if(ConditionDef.evaluate(condition, fromState.second, pgTrans.getCondition()))
+                    {
+                        if(!channelActionDef.isOneSidedAction(currAction) && ActionDef.effect(effects, fromState.second, pgTrans.getAction()) != null)
+                        {
+                            transitionSystem.addAction(pgTrans.getAction());
+                            List<L> locsForNewState = new ArrayList<L>(fromState.getFirst());
+                            locsForNewState.set(i, pgTrans.getTo());
+                            Pair<List<L>, Map<String, Object>> toState = new Pair<>(locsForNewState, ActionDef.effect(effects, fromState.second, pgTrans.getAction()));
+                            Transition< Pair<List<L>, Map<String, Object>>, A> newTrans = new Transition<>(fromState, pgTrans.getAction(), toState);
+                            addStateIfNeeded(transitionSystem, queue, allReadyChecked, toState);
+                            transitionSystem.addTransition(newTrans);
+                        }
+                        else //this is a capacity 0 action
+                        {
+                            Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransToIterate = null;
+                            String firstQueueName = getQueueNameFromOneSidedAction(currAction);
+                            if(currAction.contains("?")) //this is an action such as _T?x, means read action from capacity 0
+                                allOneSidedTransToIterate = allOneSidedTransMapWrite;
+                            else//this is an action such as _T!3, means write action to capacity 0
+                                allOneSidedTransToIterate = allOneSidedTransMapRead;
+
+                            for(int pgNum = i+1; pgNum < channelSystem.getProgramGraphs().size(); pgNum++)
+                            {
+                                for(PGTransition<L, A> otherPGTrans : allOneSidedTransToIterate.get(pgNum))
+                                {
+                                    if(ConditionDef.evaluate(condition, fromState.second, otherPGTrans.getCondition()) &&
+                                            firstQueueName.equals(getQueueNameFromOneSidedAction(otherPGTrans.getAction().toString())))
+                                    {
+                                        String newAction = currAction + "|" + otherPGTrans.getAction().toString();
+                                        transitionSystem.addAction((A)newAction);
+                                        List<L> locsForNewState = new ArrayList<L>(fromState.getFirst());
+                                        locsForNewState.set(i, pgTrans.getTo());
+                                        locsForNewState.set(pgNum, otherPGTrans.getTo());
+                                        Pair<List<L>, Map<String, Object>> toState = new Pair<>(locsForNewState, channelActionDef.effect(fromState.second, newAction));
+                                        Transition<Pair<List<L>, Map<String, Object>>, A> newTrans = new Transition<>(fromState, (A)newAction, toState);
+                                        addStateIfNeeded(transitionSystem, queue, allReadyChecked, toState);
+                                        transitionSystem.addTransition(newTrans);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private <L,A> void addInitialStatesTransitionSystemFromChannelSystemAccordingToSize(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystem,
+                                                    ChannelSystem<L, A> channelSystem, List<L> newInitialLocations, Set<Map<String, Object>> evaluations)
+    {
+        int size = newInitialLocations.size();
+        if(size == channelSystem.getProgramGraphs().size())
+        {
+            if(evaluations.isEmpty())
+            {
+                Pair<List<L>, Map<String, Object>> newState = new Pair<>
+                        (new ArrayList<>(newInitialLocations), new HashMap<>());
+                transitionSystem.addState(newState);
+                transitionSystem.setInitial(newState, true);
+            }
+
+            for(Map<String, Object> evaluation : evaluations)
+            {
+                Pair<List<L>, Map<String, Object>> newState = new Pair<>
+                        (new ArrayList<>(newInitialLocations), new HashMap<>(evaluation));
+                transitionSystem.addState(newState);
+                transitionSystem.setInitial(newState, true);
+            }
+        } else {
+            for(L location : channelSystem.getProgramGraphs().get(size).getInitialLocations())
+            {
+                newInitialLocations.add(location);
+                addInitialStatesTransitionSystemFromChannelSystemAccordingToSize(transitionSystem, channelSystem, newInitialLocations, evaluations);
+                newInitialLocations.remove(location);
+            }
+        }
+    }
+
+    private Set<Map<String, Object>> getMapsFromInitializations(Set<List<String>> initializations, Set<ActionDef> effect)
+    {
+        Set<Map<String, Object>> evaluations = new HashSet<>();
+
+        for(List<String> variableInit : initializations)
+        {
+            Map<String, Object> variableInitMap = new HashMap<>();
+            for(String action : variableInit)
+                variableInitMap = ActionDef.effect(effect, variableInitMap, action);
+            evaluations.add(variableInitMap);
+        }
+
+        return evaluations;
+    }
+
+    private <L,A> void getInitializationsFromChannelSystem(ChannelSystem<L, A> channelSystem,
+                           Set<List<String>> allInitializations, int programGraphNumber, List<String> acc) {
+        if (programGraphNumber == channelSystem.getProgramGraphs().size()){
+            allInitializations.add(acc);
+        } else {
+            if(channelSystem.getProgramGraphs().get(programGraphNumber).getInitalizations().isEmpty()) {
+                getInitializationsFromChannelSystem(channelSystem, allInitializations, programGraphNumber + 1, acc);
+            } else {
+                for(List<String> initialization : channelSystem.getProgramGraphs().get(programGraphNumber).getInitalizations())
+                {
+                    List<String> newAcc = new ArrayList<>(acc);
+                    newAcc.addAll(initialization);
+                    getInitializationsFromChannelSystem(channelSystem, allInitializations, programGraphNumber + 1, newAcc);
+                }
+            }
+        }
+    }
+
+    private <L,A> void addInitialStateTransitionSystemFromChannelSystem(TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystem,
+                                               ChannelSystem<L, A> channelSystem, Set<ActionDef> effects)
+    {
+        List<L> newInitialLocations = new ArrayList<>();
+        Set<List<String>> initializations = new HashSet<>();
+        getInitializationsFromChannelSystem(channelSystem, initializations, 0, new ArrayList<>());
+        Set<Map<String, Object>> evaluations = getMapsFromInitializations(initializations, effects);
+        addInitialStatesTransitionSystemFromChannelSystemAccordingToSize(transitionSystem, channelSystem, newInitialLocations, evaluations);
     }
 
     @Override
-    public <L, A> TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystemFromChannelSystem(ChannelSystem<L, A> cs) {
-        TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> res = createTransitionSystem();
+    public <L, A> TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystemFromChannelSystem(ChannelSystem<L, A> channelSystem) {
+        TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystem = createTransitionSystem();
         Set<ActionDef> effects = new HashSet<>();
         effects.add(new ParserBasedActDef());
         Set<ConditionDef> conditions = new HashSet<>();
         conditions.add(new ParserBasedCondDef());
-        addInitialStateTSFromCS(res, cs, effects);
-        transitionSystemFromCSFromInitialStates(res, cs, effects, conditions);
-        addAtomicPropositionToTsFromCs(res);
-        addLabelsToTSFromCS(res);
-
-        return res;
+        addInitialStateTransitionSystemFromChannelSystem(transitionSystem, channelSystem, effects);
+        transitionSystemFromCSFromInitialStates(transitionSystem, channelSystem, effects, conditions);
+        addAtomicPropositionToTransitionSystemFromChannelSystem(transitionSystem);
+        addLabelsToTransitionSystemFromChannelSystem(transitionSystem);
+        return transitionSystem;
     }
 
     @Override
     public <Sts, Saut, A, P> TransitionSystem<Pair<Sts, Saut>, A, Saut> product(TransitionSystem<Sts, A, P> ts, Automaton<Saut, P> aut) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement product
+        TransitionSystem<Pair<Sts, Saut>, A, Saut> res = createTransitionSystem();
+        createProductInitialStates(res, ts, aut);
+        createProductFromInitialStates(res, ts, aut);
+        addLabelsToProduct(res);
+        return res;
     }
 
     @Override
