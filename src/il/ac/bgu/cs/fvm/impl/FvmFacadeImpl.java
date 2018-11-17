@@ -85,9 +85,7 @@ public class FvmFacadeImpl implements FvmFacade {
         Set<S> postStatesResults = new HashSet<>();
         for(S state: c){
             Set<S> postStatesPerState = post(transitionSystem, state);
-            for (S postStates: postStatesPerState){
-                postStatesResults.add(postStates);
-            }
+            postStatesResults.addAll(postStatesPerState);
         }
         return postStatesResults;
     }
@@ -108,31 +106,51 @@ public class FvmFacadeImpl implements FvmFacade {
         Set<S> postStatesResults = new HashSet<>();
         for(S state: c){
             Set<S> postStatesPerState = post(transitionSystem, state, action);
-            for (S postStates: postStatesPerState){
-                postStatesResults.add(postStates);
-            }
+            postStatesResults.addAll(postStatesPerState);
         }
         return postStatesResults;
     }
 
     @Override
-    public <S> Set<S> pre(TransitionSystem<S, ?, ?> ts, S s) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement pre
+    public <S> Set<S> pre(TransitionSystem<S, ?, ?> transitionSystem, S state) {
+        Set<S> preStates = new HashSet<>();
+        for(Transition<S,?> transition: transitionSystem.getTransitions()){
+            if(transition.getTo().equals(state)){
+                preStates.add(transition.getFrom());
+            }
+        }
+        return preStates;
     }
 
     @Override
-    public <S> Set<S> pre(TransitionSystem<S, ?, ?> ts, Set<S> c) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement pre
+    public <S> Set<S> pre(TransitionSystem<S, ?, ?> transitionSystem, Set<S> c) {
+        Set<S> preStatesResults = new HashSet<>();
+        for(S state: c){
+            Set<S> preStatesPerState = pre(transitionSystem, state);
+            preStatesResults.addAll(preStatesPerState);
+        }
+        return preStatesResults;
     }
 
     @Override
-    public <S, A> Set<S> pre(TransitionSystem<S, A, ?> ts, S s, A a) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement pre
+    public <S, A> Set<S> pre(TransitionSystem<S, A, ?> transitionSystem, S state, A action) {
+        Set<S> preStates = new HashSet<>();
+        for(Transition<S, A> transitions: transitionSystem.getTransitions() ){
+            if(transitions.getTo().equals(state) && transitions.getAction().equals(action)){
+                preStates.add(transitions.getFrom());
+            }
+        }
+        return preStates;
     }
 
     @Override
-    public <S, A> Set<S> pre(TransitionSystem<S, A, ?> ts, Set<S> c, A a) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement pre
+    public <S, A> Set<S> pre(TransitionSystem<S, A, ?> transitionSystem, Set<S> c, A action) {
+        Set<S> preStatesResults = new HashSet<>();
+        for(S state: c){
+            Set<S> preStatesPerState = pre(transitionSystem, state, action);
+            preStatesResults.addAll(preStatesPerState);
+        }
+        return preStatesResults;
     }
 
     @Override
