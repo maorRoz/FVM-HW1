@@ -25,6 +25,7 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
     private Set<Transition<STATE, ACTION>> transitions;
     private Set<ATOMIC_PROPOSITION> atomicProp;
     private Map<STATE, Set<ATOMIC_PROPOSITION>> stateToLabels;
+    private Set<STATE> initialsThatCanBeRemoved;
 
     TransitionSystemImpl()
     {
@@ -34,6 +35,7 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
         this.transitions = new HashSet<>();
         this.atomicProp = new HashSet<>();
         this.stateToLabels = new HashMap<>();
+        this.initialsThatCanBeRemoved = new HashSet<>();
     }
 
     @Override
@@ -56,11 +58,11 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
         if(!this.states.contains(var1))
             throw new StateNotFoundException("the state is not one of the states");
 
-        if (var2) {
-            this.initialStates.add(var1);
-        } else {
-            addState(var1);
+        if (!var2) {
+            this.initialsThatCanBeRemoved.add(var1);
         }
+        this.addState(var1);
+        this.initialStates.add(var1);
     }
 
     @Override
@@ -94,11 +96,12 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
             throw new DeletionOfAttachedStateException(state, TransitionSystemPart.LABELING_FUNCTION);
         }
 
-        if(this.initialStates.contains(state)) {
+        if(this.initialStates.contains(state) && !this.initialsThatCanBeRemoved.contains(state)) {
             throw new DeletionOfAttachedStateException(state, TransitionSystemPart.INITIAL_STATES);
         }
 
         this.states.remove(state);
+        this.initialStates.remove(state);
     }
 
     @Override

@@ -137,6 +137,9 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <S> Set<S> post(TransitionSystem<S, ?, ?> transitionSystem, S state) {
+        if(!transitionSystem.getStates().contains(state)){
+            throw new StateNotFoundException("The state doesn't exist in this transition system!");
+        }
         Set<S> postStatesResults = new HashSet<>();
         for(Transition<S, ?> transition: transitionSystem.getTransitions()){
             if(transition.getFrom().equals(state)){
@@ -179,6 +182,9 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <S> Set<S> pre(TransitionSystem<S, ?, ?> transitionSystem, S state) {
+        if(!transitionSystem.getStates().contains(state)){
+            throw new StateNotFoundException("The state doesn't exist in this transition system!");
+        }
         Set<S> preStates = new HashSet<>();
         for(Transition<S,?> transition: transitionSystem.getTransitions()){
             if(transition.getTo().equals(state)){
@@ -221,15 +227,15 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <S, A> Set<S> reach(TransitionSystem<S, A, ?> transitionSystem) {
-        Set<S> reachableStates = transitionSystem.getInitialStates();
-        Set<S> statesToCheck = transitionSystem.getInitialStates();
-        while(statesToCheck.size() > 0){
-            for(S state: statesToCheck){
+        Set<S> reachableStates = new HashSet<>(transitionSystem.getInitialStates());
+        Set<S> checked = new HashSet<>();
+        while(checked.size() != reachableStates.size()){
+            Set<S> toCheck = new HashSet<>(reachableStates);
+            for(S state: toCheck){
                 for (S postState : post(transitionSystem, state)){
                     reachableStates.add(postState);
-                    statesToCheck.add(postState);
                 }
-                statesToCheck.remove(state);
+                checked.add(state);
             }
         }
         return reachableStates;
@@ -247,6 +253,29 @@ public class FvmFacadeImpl implements FvmFacade {
                 Pair<S1,S2> state = new Pair<>(state1, state2);
                 interleave.addState(state);
                 interleave.setInitial(state, true);
+            }
+        }
+    }
+
+    private <S1, S2, A, P> void removeNotReachableStates(TransitionSystem<Pair<S1, S2>, A, P> interleave){
+        Set<Pair<S1, S2>> reachable = new HashSet<>();
+        for(Transition<Pair<S1,S2>, A> transition: interleave.getTransitions()){
+            reachable.add(transition.getFrom());
+            reachable.add(transition.getTo());
+        }
+        for(Pair<S1, S2> interleaveState : interleave.getStates()){
+            if(!reachable.contains(interleaveState)){
+                interleave.removeState(interleaveState);
+            }
+        }
+    }
+
+    private <S1, S2, A, P> void createStates(TransitionSystem<Pair<S1, S2>, A, P> interleave,
+                                                    TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2){
+        for(S1 state1 : transitionSystem1.getStates()){
+            for(S2 state2 : transitionSystem2.getStates()){
+                Pair<S1,S2> state = new Pair<>(state1, state2);
+                interleave.addState(state);
             }
         }
     }
@@ -277,7 +306,7 @@ public class FvmFacadeImpl implements FvmFacade {
                 return transition.getTo();
             }
         }
-        return null;
+        return state;
     }
 
     private <S1, S2, A, P> void handleTransitionIncludingHandshaking(TransitionSystem<Pair<S1, S2>, A, P> interleave,
@@ -324,9 +353,10 @@ public class FvmFacadeImpl implements FvmFacade {
         resultInterleave.addAllActions(transitionSystem1.getActions());
         resultInterleave.addAllActions(transitionSystem2.getActions());
         createInitialStates(resultInterleave, transitionSystem1, transitionSystem2);
+        createStates(resultInterleave, transitionSystem1, transitionSystem2);
         handleTransitionIncludingHandshaking(resultInterleave, transitionSystem1, transitionSystem2, handShakingActions);
-        //to deal with the hand shaking
         createAtomicPropositions(resultInterleave, transitionSystem1, transitionSystem2);
+        removeNotReachableStates(resultInterleave);
         return resultInterleave;
     }
 
