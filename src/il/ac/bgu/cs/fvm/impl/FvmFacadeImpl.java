@@ -232,9 +232,7 @@ public class FvmFacadeImpl implements FvmFacade {
         while(checked.size() != reachableStates.size()){
             Set<S> toCheck = new HashSet<>(reachableStates);
             for(S state: toCheck){
-                for (S postState : post(transitionSystem, state)){
-                    reachableStates.add(postState);
-                }
+                reachableStates.addAll(post(transitionSystem, state));
                 checked.add(state);
             }
         }
@@ -259,23 +257,14 @@ public class FvmFacadeImpl implements FvmFacade {
 
     private <S1, S2, A, P> void removeNotReachableStates(TransitionSystem<Pair<S1, S2>, A, P> interleave){
         Set<Pair<S1, S2>> reachable = new HashSet<>();
+        Set<Pair<S1, S2>> states = new HashSet<>(interleave.getStates());
         for(Transition<Pair<S1,S2>, A> transition: interleave.getTransitions()){
             reachable.add(transition.getFrom());
             reachable.add(transition.getTo());
         }
-        for(Pair<S1, S2> interleaveState : interleave.getStates()){
+        for(Pair<S1, S2> interleaveState : states){
             if(!reachable.contains(interleaveState)){
                 interleave.removeState(interleaveState);
-            }
-        }
-    }
-
-    private <S1, S2, A, P> void createStates(TransitionSystem<Pair<S1, S2>, A, P> interleave,
-                                                    TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2){
-        for(S1 state1 : transitionSystem1.getStates()){
-            for(S2 state2 : transitionSystem2.getStates()){
-                Pair<S1,S2> state = new Pair<>(state1, state2);
-                interleave.addState(state);
             }
         }
     }
@@ -300,46 +289,54 @@ public class FvmFacadeImpl implements FvmFacade {
         }
     }
 
-    private <S, A, P> S findStateTo(TransitionSystem<S, A, P> transitionSystem, S state, A action){
-        for(Transition<S,A> transition: transitionSystem.getTransitions()){
-            if(transition.getFrom().equals(state) && transition.getAction().equals(action)){
-                return transition.getTo();
-            }
-        }
-        return state;
-    }
-
     private <S1, S2, A, P> void handleTransitionIncludingHandshaking(TransitionSystem<Pair<S1, S2>, A, P> interleave,
-                                                                     TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2, Set<A> handShakingActions) {
-        Set<Transition<S1, A>> ts1Transitions = transitionSystem1.getTransitions();
-        Set<Transition<S2, A>> ts2Transitions = transitionSystem2.getTransitions();
-        for (Pair<S1, S2> interleaveState : interleave.getStates()) {
-            for (Transition<S1, A> ts1Transition : ts1Transitions) {
-                if (ts1Transition.getFrom().equals(interleaveState.getFirst())) {
-                    //not a handshake action, then do it in a regular rule
-                    if (!handShakingActions.contains(ts1Transition.getAction())) {
-                        Pair<S1, S2> toState = new Pair<>(ts1Transition.getTo(), interleaveState.getSecond());
-                        Transition<Pair<S1, S2>, A> addTransition = new Transition<>(interleaveState, ts1Transition.getAction(), toState);
-                        interleave.addTransition(addTransition);
-                    } else {
-                        S2 stateToS2 = findStateTo(transitionSystem2, interleaveState.getSecond(), ts1Transition.getAction());
-                        if (stateToS2 == null) {
-                            throw new ActionNotFoundException("Action should be handshake but it is not");
+                                                      TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2, Set<A> handShake, Set<Pair<S1, S2>> stateChecked) {
+        Set<Pair<S1, S2>> toCheck = new HashSet<>(interleave.getStates());
+        toCheck.removeAll(stateChecked);
+        if (!toCheck.isEmpty()) {
+            for (Pair<S1, S2> interleaveState : toCheck) {
+                for (Transition<S1, A> t1 : transitionSystem1.getTransitions()) {
+                    if (t1.getFrom().equals(interleaveState.getFirst())) {
+                        if (!handShake.contains(t1.getAction())) {
+                            Pair<S1, S2> stateTo = new Pair<>(t1.getTo(), interleaveState.getSecond());
+                            interleave.addState(stateTo);
+                            Transition<Pair<S1, S2>, A> newTr = new Transition<>(interleaveState, t1.getAction(), stateTo);
+                            interleave.addTransition(newTr);
+                        } else
+                            addHandShakeTransitions(interleave, transitionSystem1, transitionSystem2, interleaveState, t1.getAction());
+                    }
+                }
+
+                for (Transition<S2, A> t2 : transitionSystem2.getTransitions()) {
+                    if (!handShake.contains(t2.getAction())) {
+                        if (t2.getFrom().equals(interleaveState.getSecond())) {
+                            Pair<S1, S2> stateTo = new Pair<>(interleaveState.getFirst(), t2.getTo());
+                            interleave.addState(stateTo);
+                            Transition<Pair<S1, S2>, A> newTr = new Transition<>(interleaveState, t2.getAction(), stateTo);
+                            interleave.addTransition(newTr);
                         }
-                        Pair<S1, S2> toState = new Pair<>(ts1Transition.getTo(), stateToS2);
-                        Transition<Pair<S1, S2>, A> addTransition = new Transition<>(interleaveState, ts1Transition.getAction(), toState);
-                        interleave.addTransition(addTransition);
                     }
                 }
             }
+            Set<Pair<S1, S2>> stateCheckedNew = new HashSet<>(stateChecked);
+            stateCheckedNew.addAll(toCheck);
+            handleTransitionIncludingHandshaking(interleave, transitionSystem1, transitionSystem2, handShake, stateCheckedNew);
+        }
+    }
 
-            for (Transition<S2, A> ts2Transition : ts2Transitions) {
-                if (ts2Transition.getFrom().equals(interleaveState.getSecond())) {
-                    if (!handShakingActions.contains(ts2Transition.getAction())) {
-                        Pair<S1, S2> toState = new Pair<>(interleaveState.getFirst(), ts2Transition.getTo());
-                        Transition<Pair<S1, S2>, A> addTransition = new Transition<>(interleaveState, ts2Transition.getAction(), toState);
-                        interleave.addTransition(addTransition);
-                    }
+    private <A, S1, S2, P> void addHandShakeTransitions(TransitionSystem<Pair<S1, S2>, A, P> interleave, TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2,
+                                                        Pair<S1, S2> interleaveState, A action){
+        Set<S1> statesTo1 = post(ts1, interleaveState.getFirst(), action);
+        Set<S2> statesTo2 = post(ts2, interleaveState.getSecond(), action);
+        if(!statesTo1.isEmpty() && !statesTo2.isEmpty())
+        {
+            for(S1 s1 : statesTo1)
+            {
+                for(S2 s2 : statesTo2)
+                {
+                    Pair<S1, S2> stateTo = new Pair<>(s1, s2);
+                    interleave.addState(stateTo);
+                    interleave.addTransition(new Transition<>(interleaveState, action, stateTo));
                 }
             }
         }
@@ -353,8 +350,7 @@ public class FvmFacadeImpl implements FvmFacade {
         resultInterleave.addAllActions(transitionSystem1.getActions());
         resultInterleave.addAllActions(transitionSystem2.getActions());
         createInitialStates(resultInterleave, transitionSystem1, transitionSystem2);
-        createStates(resultInterleave, transitionSystem1, transitionSystem2);
-        handleTransitionIncludingHandshaking(resultInterleave, transitionSystem1, transitionSystem2, handShakingActions);
+        handleTransitionIncludingHandshaking(resultInterleave, transitionSystem1, transitionSystem2, handShakingActions, new HashSet<>());
         createAtomicPropositions(resultInterleave, transitionSystem1, transitionSystem2);
         removeNotReachableStates(resultInterleave);
         return resultInterleave;
@@ -787,54 +783,43 @@ public class FvmFacadeImpl implements FvmFacade {
             Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransMapRead = getAllOneSidedActionTransFromAllTrans(allPGTransMap, "?");
             Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransMapWrite = getAllOneSidedActionTransFromAllTrans(allPGTransMap, "!");
             for(int i = 0; i < allPGTransMap.size(); i++)
-            {
-                for(PGTransition<L, A> pgTrans : allPGTransMap.get(i))
-                {
+                for (PGTransition<L, A> pgTrans : allPGTransMap.get(i)) {
                     String currAction = pgTrans.getAction().toString();
-                    if(ConditionDef.evaluate(condition, fromState.second, pgTrans.getCondition()))
-                    {
-                        if(!channelActionDef.isOneSidedAction(currAction) && ActionDef.effect(effects, fromState.second, pgTrans.getAction()) != null)
-                        {
+                    if (ConditionDef.evaluate(condition, fromState.second, pgTrans.getCondition())) {
+                        if (!channelActionDef.isOneSidedAction(currAction) && ActionDef.effect(effects, fromState.second, pgTrans.getAction()) != null) {
                             transitionSystem.addAction(pgTrans.getAction());
-                            List<L> locsForNewState = new ArrayList<L>(fromState.getFirst());
+                            List<L> locsForNewState = new ArrayList<>(fromState.getFirst());
                             locsForNewState.set(i, pgTrans.getTo());
                             Pair<List<L>, Map<String, Object>> toState = new Pair<>(locsForNewState, ActionDef.effect(effects, fromState.second, pgTrans.getAction()));
-                            Transition< Pair<List<L>, Map<String, Object>>, A> newTrans = new Transition<>(fromState, pgTrans.getAction(), toState);
+                            Transition<Pair<List<L>, Map<String, Object>>, A> newTrans = new Transition<>(fromState, pgTrans.getAction(), toState);
                             addStateIfNeeded(transitionSystem, queue, allReadyChecked, toState);
                             transitionSystem.addTransition(newTrans);
-                        }
-                        else //this is a capacity 0 action
+                        } else //this is a capacity 0 action
                         {
-                            Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransToIterate = null;
+                            Map<Integer, Set<PGTransition<L, A>>> allOneSidedTransToIterate;
                             String firstQueueName = getQueueNameFromOneSidedAction(currAction);
-                            if(currAction.contains("?")) //this is an action such as _T?x, means read action from capacity 0
+                            if (currAction.contains("?")) //this is an action such as _T?x, means read action from capacity 0
                                 allOneSidedTransToIterate = allOneSidedTransMapWrite;
                             else//this is an action such as _T!3, means write action to capacity 0
                                 allOneSidedTransToIterate = allOneSidedTransMapRead;
 
-                            for(int pgNum = i+1; pgNum < channelSystem.getProgramGraphs().size(); pgNum++)
-                            {
-                                for(PGTransition<L, A> otherPGTrans : allOneSidedTransToIterate.get(pgNum))
-                                {
-                                    if(ConditionDef.evaluate(condition, fromState.second, otherPGTrans.getCondition()) &&
-                                            firstQueueName.equals(getQueueNameFromOneSidedAction(otherPGTrans.getAction().toString())))
-                                    {
+                            for (int pgNum = i + 1; pgNum < channelSystem.getProgramGraphs().size(); pgNum++)
+                                for (PGTransition<L, A> otherPGTrans : allOneSidedTransToIterate.get(pgNum))
+                                    if (ConditionDef.evaluate(condition, fromState.second, otherPGTrans.getCondition()) &&
+                                            firstQueueName.equals(getQueueNameFromOneSidedAction(otherPGTrans.getAction().toString()))) {
                                         String newAction = currAction + "|" + otherPGTrans.getAction().toString();
-                                        transitionSystem.addAction((A)newAction);
-                                        List<L> locsForNewState = new ArrayList<L>(fromState.getFirst());
+                                        transitionSystem.addAction((A) newAction);
+                                        List<L> locsForNewState = new ArrayList<>(fromState.getFirst());
                                         locsForNewState.set(i, pgTrans.getTo());
                                         locsForNewState.set(pgNum, otherPGTrans.getTo());
                                         Pair<List<L>, Map<String, Object>> toState = new Pair<>(locsForNewState, channelActionDef.effect(fromState.second, newAction));
-                                        Transition<Pair<List<L>, Map<String, Object>>, A> newTrans = new Transition<>(fromState, (A)newAction, toState);
+                                        Transition<Pair<List<L>, Map<String, Object>>, A> newTrans = new Transition<>(fromState,(A)newAction, toState);
                                         addStateIfNeeded(transitionSystem, queue, allReadyChecked, toState);
                                         transitionSystem.addTransition(newTrans);
                                     }
-                                }
-                            }
                         }
                     }
                 }
-            }
         }
     }
 
@@ -926,7 +911,7 @@ public class FvmFacadeImpl implements FvmFacade {
         return transitionSystem;
     }
 
-    private <Sts, Saut, A, P> void addLabelsToProduct(TransitionSystem<Pair<Sts, Saut>, A, Saut> productTransitionSystem)
+    private <Sts, Saut, A> void addLabelsToProduct(TransitionSystem<Pair<Sts, Saut>, A, Saut> productTransitionSystem)
     {
         for(Pair<Sts, Saut> sts : productTransitionSystem.getStates())
         {
@@ -991,7 +976,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
         for(Sts tsState : tsInitials)
         {
-            Set<P> transitionSystemLabel = transitionSystemLabelingFunction.get(tsState) != null ? transitionSystemLabelingFunction.get(tsState) : new HashSet<P>();
+            Set<P> transitionSystemLabel = transitionSystemLabelingFunction.get(tsState) != null ? transitionSystemLabelingFunction.get(tsState) : new HashSet<>();
             for(Saut automatonState: automatonInitials)
             {
                 //check if there is a transition from autState with action which is the label of tsState
@@ -1029,23 +1014,23 @@ public class FvmFacadeImpl implements FvmFacade {
 
     private String turnToNanoPromelaString(String loc)
     {
-        String res = "";
+        StringBuilder res = new StringBuilder();
         for(int i = 0; i < loc.length() ; i++)
         {
             if(i+1 < loc.length() && ((loc.charAt(i) == 'o' && loc.charAt(i + 1) == 'd') || (loc.charAt(i) == 'f' && loc.charAt(i + 1) == 'i')))
             {
                 if(!(i+2 < loc.length() && loc.substring(i-1, i+3).equals("soda")))
                 {
-                    res += " " + loc.charAt(i) + loc.charAt(i + 1);
+                    res.append(" ").append(loc.charAt(i)).append(loc.charAt(i + 1));
                     i++;
                 }
                 else
-                    res += loc.charAt(i);
+                    res.append(loc.charAt(i));
             }
             else
-                res += loc.charAt(i);
+                res.append(loc.charAt(i));
         }
-        return res;
+        return res.toString();
     }
 
     private void runNewLocs(ProgramGraph<String, String> pg, Set<String> originalLocations) {
@@ -1082,31 +1067,31 @@ public class FvmFacadeImpl implements FvmFacade {
             pg.addLocation(toState);
 
             newCond = addClosingParanToCond(newCond);
-            PGTransition<String, String> newTransForOriginalPG = new PGTransition<String, String>(fromState, newCond, firstPGTrans.getAction(), toState);
+            PGTransition<String, String> newTransForOriginalPG = new PGTransition<>(fromState, newCond, firstPGTrans.getAction(), toState);
             pg.addTransition(newTransForOriginalPG);
         }
     }
 
     private void handleAllDoOptionsDontExist(ProgramGraph<String, String> programGraph,
                                              StmtContext rootStmt, String condition, List<OptionContext> options) {
-        String newCondition = condition;
-        if(!newCondition.isEmpty())
-            newCondition += " && (";
-        newCondition += "!(";
+        StringBuilder newCondition = new StringBuilder(condition);
+        if(newCondition.length() > 0)
+            newCondition.append(" && (");
+        newCondition.append("!(");
         for(int i = 0; i < options.size(); i++)
         {
-            newCondition = newCondition + "(" + options.get(i).boolexpr().getText() + ")";
+            newCondition.append("(").append(options.get(i).boolexpr().getText()).append(")");
             if(i < options.size() - 1)
-                newCondition += "||";
+                newCondition.append("||");
         }
-        newCondition = addClosingParanToCond(newCondition);
-        PGTransition<String, String> newTrans = new PGTransition<String, String>(rootStmt.getText(), newCondition, "", "");
+        newCondition = new StringBuilder(addClosingParanToCond(newCondition.toString()));
+        PGTransition<String, String> newTrans = new PGTransition<>(rootStmt.getText(), newCondition.toString(), "", "");
         programGraph.addTransition(newTrans);
     }
 
     private String addClosingParanToCond(String s)
     {
-        String res = s;
+        StringBuilder res = new StringBuilder(s);
         int countOpen = 0;
         for(int i = 0; i < s.length(); i++)
         {
@@ -1118,9 +1103,9 @@ public class FvmFacadeImpl implements FvmFacade {
 
         for(int i = 0 ; i < countOpen; i++)
         {
-            res += ")";
+            res.append(")");
         }
-        return res;
+        return res.toString();
     }
 
     private void handleIfDoStmt(ProgramGraph<String, String> programGraph, StmtContext rootStmt, StmtContext child, String condition)
@@ -1181,7 +1166,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
     private List<StmtContext> getRestStmts(StmtContext s)
     {
-        List<StmtContext> res = new ArrayList<StmtContext>();
+        List<StmtContext> res = new ArrayList<>();
         StmtContext iterator = s;
         while(iterator.stmt() != null && !iterator.stmt().isEmpty())
         {
@@ -1193,12 +1178,12 @@ public class FvmFacadeImpl implements FvmFacade {
 
     private String turnStmtsToString(List<StmtContext> stmts)
     {
-        String res = stmts.get(0).getText();
+        StringBuilder res = new StringBuilder(stmts.get(0).getText());
         for(int i = 1; i < stmts.size(); i++)
         {
-            res = res + ";" + stmts.get(i).getText();
+            res.append(";").append(stmts.get(i).getText());
         }
-        return res;
+        return res.toString();
     }
 
     private void handleNekudaPsikStatement(ProgramGraph<String, String> programGraph,
@@ -1249,22 +1234,19 @@ public class FvmFacadeImpl implements FvmFacade {
     @Override
     public ProgramGraph<String, String> programGraphFromNanoPromela(String filename) throws Exception {
         StmtContext stmtContext = NanoPromelaFileReader.pareseNanoPromelaFile(filename);
-        ProgramGraph<String, String> programGraph = programGraphFromRoot(stmtContext);
-        return programGraph;
+        return programGraphFromRoot(stmtContext);
     }
 
     @Override
-    public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) throws Exception {
+    public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) {
         StmtContext stmtContext = NanoPromelaFileReader.pareseNanoPromelaString(nanopromela);
-        ProgramGraph<String, String> programGraph = programGraphFromRoot(stmtContext);
-        return programGraph;
+        return programGraphFromRoot(stmtContext);
     }
 
     @Override
     public ProgramGraph<String, String> programGraphFromNanoPromela(InputStream inputStream) throws Exception {
         StmtContext stmtContext = NanoPromelaFileReader.parseNanoPromelaStream(inputStream);
-        ProgramGraph<String, String> programGraph = programGraphFromRoot(stmtContext);
-        return programGraph;
+        return programGraphFromRoot(stmtContext);
     }
 
     private <S, A, Saut> List<S> findRouteBetweenStatesHelper(TransitionSystem<Pair<S, Saut>, A, Saut> transitionSystemAfterProduct,
@@ -1298,25 +1280,21 @@ public class FvmFacadeImpl implements FvmFacade {
                                                           Pair<S, Saut> from, Pair<S, Saut> to)
     {
         Set<Pair<S, Saut>> allReadyChecked = new HashSet<>();
-        List<S> ans = findRouteBetweenStatesHelper(transitionSystemAfterProduct, from, to, allReadyChecked, new LinkedList<S>());
-        return ans;
+        return findRouteBetweenStatesHelper(transitionSystemAfterProduct, from, to, allReadyChecked, new LinkedList<>());
     }
 
     @Override
     public <S, A, P, Saut> VerificationResult<S> verifyAnOmegaRegularProperty(TransitionSystem<S, A, P> transitionSystem, Automaton<Saut, P> automaton) {
         TransitionSystem<Pair<S, Saut>, A, Saut> transitionSystemAfterProduct = product(transitionSystem, automaton);
         Set<Saut> acceptingStatesAut = automaton.getAcceptingStates();
+        //check if this is an accepting state in the product ts
         for(Pair<S, Saut> sTsAfterProduct : transitionSystemAfterProduct.getStates())
-        {
-            //check if this is an accepting state in the product ts
-            if(acceptingStatesAut.contains(sTsAfterProduct.getSecond()))
-            {
+            if (acceptingStatesAut.contains(sTsAfterProduct.getSecond())) {
                 List<S> cycle = findRouteBetweenStates(transitionSystemAfterProduct, sTsAfterProduct, sTsAfterProduct);
-                if(cycle != null)
-                {
-                    for(Pair<S, Saut> initalState : transitionSystemAfterProduct.getInitialStates())
-                    {
-                        List<S> prefix = findRouteBetweenStates(transitionSystemAfterProduct, initalState, sTsAfterProduct);
+                if (cycle != null) {
+                    for (Iterator<Pair<S, Saut>> iterator = transitionSystemAfterProduct.getInitialStates().iterator(); iterator.hasNext(); ) {
+                        Pair<S, Saut> initialState = iterator.next();
+                        List<S> prefix = findRouteBetweenStates(transitionSystemAfterProduct, initialState, sTsAfterProduct);
                         VerificationFailed<S> ans = new VerificationFailed<>();
                         ans.setCycle(cycle);
                         ans.setPrefix(prefix);
@@ -1324,7 +1302,6 @@ public class FvmFacadeImpl implements FvmFacade {
                     }
                 }
             }
-        }
         return new VerificationSucceeded<>();
     }
 
@@ -1361,29 +1338,24 @@ public class FvmFacadeImpl implements FvmFacade {
             while (exist && itr.hasNext()) {
                 LTL<L> item = itr.next();
                 if (item instanceof And)
-                    if(sub_exp.contains(((And<L>) item).getLeft()) && sub_exp.contains(((And<L>) item).getRight()))
-                        exist = true;
-                    else
+                    if (sub_exp.contains(((And<L>) item).getLeft())) {
+                        if (sub_exp.contains(((And<L>) item).getRight())) {
+                        } else exist = false;
+                    } else {
                         exist = false;
-                else if (item instanceof Until)
-                    if(sub_exp.contains(((Until<L>) item).getRight())
-                            || sub_exp.contains(((Until<L>) item).getLeft()))
-                        exist = true;
-                    else
-                        exist = false;
-                else if (item instanceof Not) {
+                    }
+                else if (item instanceof Until) {
+                    exist = sub_exp.contains(((Until<L>) item).getRight())
+                            || sub_exp.contains(((Until<L>) item).getLeft());
+                } else if (item instanceof Not) {
                     LTL<L> innerItem = ((Not<L>) item).getInner();
                     if (innerItem instanceof And)
-                        if(!(sub_exp.contains(((And<L>) innerItem).getLeft())
-                                && sub_exp.contains(((And<L>) innerItem).getRight())))
-                            exist = true;
-                        else
-                            exist = false;
+                        if (sub_exp.contains(((And<L>) innerItem).getLeft())
+                                && sub_exp.contains(((And<L>) innerItem).getRight())) {
+                                    exist = false;
+                                }
                     else if (innerItem instanceof Until)
-                        if( !(sub_exp.contains(((Until<L>) innerItem).getRight())))
-                            exist = true;
-                        else
-                            exist = false;
+                        exist = !(sub_exp.contains(((Until<L>) innerItem).getRight()));
                 }
             }
 
