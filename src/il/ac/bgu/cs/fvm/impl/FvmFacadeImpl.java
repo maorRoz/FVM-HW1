@@ -56,9 +56,16 @@ public class FvmFacadeImpl implements FvmFacade {
             return false;
         }
         Map<S, Set<P>> stateToLabel  = transitionSystem.getLabelingFunction();
-        Map<S, Set<P>> stateToLabelOfPostStets = new HashMap<>();
         for(S state: transitionSystem.getStates()) {
-            stateToLabelOfPostStets.put(state, stateToLabel.get(state));
+            Map<Set<P>, S> postStatesLabels = new HashMap<>();
+            Set<S> postStates = post(transitionSystem, state);
+            for (S postState : postStates) {
+                Set<P> atomicProp = stateToLabel.get(postState);
+                if (postStatesLabels.containsKey(atomicProp)) {
+                    return false;
+                }
+                postStatesLabels.put(atomicProp, postState);
+            }
         }
         return true;
     }
@@ -202,12 +209,8 @@ public class FvmFacadeImpl implements FvmFacade {
         while(statesToCheck.size() > 0){
             for(S state: statesToCheck){
                 for (S postState : post(transitionSystem, state)){
-                    if(!reachableStates.contains(postState)){
-                        reachableStates.add(postState);
-                    }
-                    if(!statesToCheck.contains(postState)){
-                        statesToCheck.add(postState);
-                    }
+                    reachableStates.add(postState);
+                    statesToCheck.add(postState);
                 }
                 statesToCheck.remove(state);
             }
@@ -251,6 +254,52 @@ public class FvmFacadeImpl implements FvmFacade {
         }
     }
 
+    private <S, A, P> S findStateTo(TransitionSystem<S, A, P> transitionSystem, S state, A action){
+        for(Transition<S,A> transition: transitionSystem.getTransitions()){
+            if(transition.getFrom().equals(state) && transition.getAction().equals(action)){
+                return transition.getTo();
+            }
+        }
+        return null;
+    }
+
+    private <S1, S2, A, P> void handleTransitionIncludingHandshaking(TransitionSystem<Pair<S1, S2>, A, P> interleave,
+                                                                     TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2, Set<A> handShakingActions) {
+        Set<Transition<S1, A>> ts1Transitions = transitionSystem1.getTransitions();
+        Set<Transition<S2, A>> ts2Transitions = transitionSystem2.getTransitions();
+        for (Pair<S1, S2> interleaveState : interleave.getStates()) {
+            for (Transition<S1, A> ts1Transition : ts1Transitions) {
+                if (ts1Transition.getFrom().equals(interleaveState.getFirst())) {
+                    //not a handshake action, then do it in a regular rule
+                    if (!handShakingActions.contains(ts1Transition.getAction())) {
+                        Pair<S1, S2> toState = new Pair<>(ts1Transition.getTo(), interleaveState.getSecond());
+                        Transition<Pair<S1, S2>, A> addTransition = new Transition<>(interleaveState, ts1Transition.getAction(), toState);
+                        interleave.addTransition(addTransition);
+                    } else {
+                        S2 stateToS2 = findStateTo(transitionSystem2, interleaveState.getSecond(), ts1Transition.getAction());
+                        if (stateToS2 == null) {
+                            throw new ActionNotFoundException("Action should be handshake but it is not");
+                        }
+                        Pair<S1, S2> toState = new Pair<>(ts1Transition.getTo(), stateToS2);
+                        Transition<Pair<S1, S2>, A> addTransition = new Transition<>(interleaveState, ts1Transition.getAction(), toState);
+                        interleave.addTransition(addTransition);
+                    }
+                }
+            }
+
+            for (Transition<S2, A> ts2Transition : ts2Transitions) {
+                if (ts2Transition.getFrom().equals(interleaveState.getSecond())) {
+                    if (!handShakingActions.contains(ts2Transition.getAction())) {
+                        Pair<S1, S2> toState = new Pair<>(interleaveState.getFirst(), ts2Transition.getTo());
+                        Transition<Pair<S1, S2>, A> addTransition = new Transition<>(interleaveState, ts2Transition.getAction(), toState);
+                        interleave.addTransition(addTransition);
+                    }
+                }
+            }
+        }
+    }
+
+
     @Override
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> transitionSystem1, TransitionSystem<S2, A, P> transitionSystem2, Set<A> handShakingActions) {
         TransitionSystem<Pair<S1, S2>, A, P> resultInterleave = createTransitionSystem();
@@ -258,6 +307,7 @@ public class FvmFacadeImpl implements FvmFacade {
         resultInterleave.addAllActions(transitionSystem1.getActions());
         resultInterleave.addAllActions(transitionSystem2.getActions());
         createInitialStates(resultInterleave, transitionSystem1, transitionSystem2);
+        handleTransitionIncludingHandshaking(resultInterleave, transitionSystem1, transitionSystem2, handShakingActions);
         //to deal with the hand shaking
         createAtomicPropositions(resultInterleave, transitionSystem1, transitionSystem2);
         return resultInterleave;
