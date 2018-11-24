@@ -16,13 +16,14 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A>{
     private Set<L> initialLocation;
     private Set<L> locations;
     private Set<PGTransition<L, A>> transitions;
-
+    private Set<L> initialsThatCanBeRemoved;
     ProgramGraphImpl()
     {
         initialLocation = new HashSet<>();
         locations = new HashSet<>();
         transitions = new HashSet<>();
         variablesInitialization = new HashSet<>();
+        initialsThatCanBeRemoved = new HashSet<>();
     }
 
     @Override
@@ -48,11 +49,11 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A>{
 
 
     @Override
-    public void setInitial(L location, boolean isLocationExist){
-        if(!isLocationExist) {
-            addLocation(location);
+    public void setInitial(L location, boolean cantRemove){
+        if(!cantRemove){
+            initialsThatCanBeRemoved.add(location);
         }
-
+        locations.add(location);
         initialLocation.add(location);
     }
 
@@ -83,7 +84,7 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A>{
 
     @Override
     public void removeLocation(L location) {
-        if(initialLocation.contains(location))
+        if(initialLocation.contains(location) && !initialsThatCanBeRemoved.contains(location))
             throw new DeletionOfAttachedStateException(location, TransitionSystemPart.INITIAL_STATES);
         if(isStateInUseInTransition(location))
             throw new DeletionOfAttachedStateException(location, TransitionSystemPart.TRANSITIONS);
