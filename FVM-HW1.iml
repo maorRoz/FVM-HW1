@@ -5,26 +5,13 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
     </content>
+    <content url="file://$MODULE_DIR$/../HW-Definitions">
+      <sourceFolder url="file://$MODULE_DIR$/../HW-Definitions/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../HW-Definitions/test" isTestSource="false" />
+    </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module-library" exported="">
-      <library>
-        <CLASSES>
-          <root url="file://$MODULE_DIR$/../HW-Definitions/out/production/HW-Definitions/il/ac/bgu/cs/fvm" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
     <orderEntry type="library" exported="" name="HW-Definitions" level="project" />
-    <orderEntry type="module-library" exported="">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/../HW-Definitions/out/artifacts/HW_Definitions_jar/HW-Definitions.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
+    <orderEntry type="library" name="HW-Definitions1" level="project" />
   </component>
 </module>

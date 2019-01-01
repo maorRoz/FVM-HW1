@@ -2,6 +2,17 @@
   <library name="HW-Definitions">
     <CLASSES>
       <root url="file://$PROJECT_DIR$/../HW-Definitions" />
+      <root url="file://$PROJECT_DIR$/../HW-Definitions/lib" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/antlr-4.7.2-complete.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/javax.activation-1.2.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/jaxb-api-2.4.0-b180830.0359.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/jaxb-core-2.3.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/jaxb-impl-2.3.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/org.svvrl.goal.cmd.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/org.svvrl.goal.core.io.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/org.svvrl.goal.core.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../HW-Definitions/lib/org.svvrl.goal.gui.jar!/" />
+      <root url="file://$PROJECT_DIR$/../HW-Tests/lib/junit_4" />
     </CLASSES>
     <JAVADOC>
       <root url="file://$PROJECT_DIR$/../HW-Definitions/doc" />
@@ -9,6 +20,10 @@
     <SOURCES>
       <root url="file://$PROJECT_DIR$/../HW-Definitions/src" />
       <root url="file://$PROJECT_DIR$/../HW-Definitions/test" />
+      <root url="file://$PROJECT_DIR$/../HW-Tests/lib/junit_4" />
     </SOURCES>
+    <jarDirectory url="file://$PROJECT_DIR$/../HW-Definitions/lib" recursive="false" />
+    <jarDirectory url="file://$PROJECT_DIR$/../HW-Tests/lib/junit_4" recursive="false" />
+    <jarDirectory url="file://$PROJECT_DIR$/../HW-Tests/lib/junit_4" recursive="false" type="SOURCES" />
   </library>
 </component>
